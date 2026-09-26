@@ -1,7 +1,7 @@
 // 画面の切り替え・タイマー・スコア・結果
 (() => {
   const { $, $$ } = U;
-  const GAMES = { quiz: QuizGame, color: ColorGame, wiring: WiringGame };
+  const GAMES = { quiz: QuizGame, color: ColorGame, wiring: WiringGame, boss: BossGame };
 
   // grades: [秀, 優, 良, 可] になる最低点。文化祭前に試遊して調整する
   const MODES = [
@@ -45,6 +45,19 @@
         '<b>小テスト（40秒）→ カラーコード（30秒）→ 配線パズル（60秒）</b> を続けて受けます。',
         '合計点で成績がつきます。可以上で単位認定。',
         'コンボは種目をまたいで続きます。',
+      ],
+    },
+    {
+      id: 'boss', name: 'ボス戦', sub: '3Dアクションで安東を倒せ', time: '3分',
+      stages: [{ kind: 'boss', time: 180 }],
+      // 倒せなければ与ダメージ（最大3000）だけなので不可。倒すと 1000 + 残り秒×20 + 残りHP が加算
+      grades: [6500, 5500, 4500, 3000],
+      howto: [
+        '安東先生を3Dのアクションで倒します。制限時間は3分。倒せば単位認定、早く倒すほど高得点。',
+        '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> で移動、マウスで視点。<b>左クリック</b>で攻撃（押しっぱなしで連続攻撃）。',
+        '<kbd>E</kbd> 元素スキル「放電」／ ゲージが満タンになったら <kbd>Q</kbd> 元素爆発「V = I R」。',
+        '<kbd>Shift</kbd>（または右クリック）で回避、<kbd>Space</kbd> でジャンプ。',
+        '<b>赤い円や帯</b>は攻撃の予告なので逃げる。<b>紫の衝撃波</b>はジャンプでかわす。',
       ],
     },
   ];
@@ -221,13 +234,14 @@
     rafId = requestAnimationFrame(loop);
   }
 
-  function endStage() {
+  function endStage(text = 'そこまで！') {
     const r = run;
     r.running = false;
+    cancelAnimationFrame(rafId);
     r.game.stop();
     r.game = null;
     Sound.end();
-    playOverlay(['そこまで！'], () => { if (run === r) nextStage(); }, 1200);
+    playOverlay([text], () => { if (run === r) nextStage(); }, 1200);
   }
 
   function makeCtx(r) {
@@ -252,6 +266,18 @@
         popup('−3秒', anchor, 'is-minus');
         flash();
         updateHud();
+      },
+      // ボス戦用：コンボなしで点を足す・統計を記録する・途中で終える
+      add(pts) {
+        if (run !== r || !r.running) return;
+        r.score += pts;
+        updateHud();
+      },
+      setStat(k, v) { r.stats[r.kind][k] = v; },
+      timeLeft: () => Math.max(0, r.timeLeft),
+      end(text) {
+        if (run !== r || !r.running) return;
+        endStage(text);
       },
       skip(sec, anchor) {
         if (run !== r || !r.running) return;
@@ -352,6 +378,7 @@
     quiz: (s) => `小テスト：${s.hit}問正解／ミス ${s.miss}`,
     color: (s) => `カラーコード：${s.hit}本正解／ミス ${s.miss}`,
     wiring: (s) => `配線パズル：${s.hit}枚クリア／パス ${s.pass}`,
+    boss: (s) => `ボス戦：与えたダメージ ${s.dmg || 0}／被ダメージ ${s.hurt || 0}　${s.win ? `撃破！（ボーナス +${s.bonus}）` : '撃破ならず'}`,
   };
 
   function finish() {
@@ -370,7 +397,7 @@
     $('#result-score').textContent = r.score;
     $('#result-stats').innerHTML = [
       ...Object.entries(r.stats).map(([k, s]) => `<li>${STAT_TEXT[k](s)}</li>`),
-      `<li>最大コンボ：${r.maxCombo}</li>`,
+      ...(r.maxCombo ? [`<li>最大コンボ：${r.maxCombo}</li>`] : []),
     ].join('');
     $('#result-bubble').textContent = U.pick(COMMENTS[grade]);
 
