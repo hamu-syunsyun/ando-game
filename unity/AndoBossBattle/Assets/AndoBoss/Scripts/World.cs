@@ -28,10 +28,10 @@ namespace AndoBoss
             if (Sun)
             {
                 Sun.color = Color.Lerp(sunDay, sunStorm, storm) * (1 + flash * 0.8f);
-                Sun.intensity = Mathf.Lerp(1.15f, 0.8f, storm) + flash * 0.6f;
+                Sun.intensity = Mathf.Lerp(1.0f, 0.75f, storm) + flash * 0.3f;
             }
             RenderSettings.fogColor = Color.Lerp(fogDay, fogStorm, storm);
-            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.62f, 0.72f, 0.9f), new Color(0.42f, 0.32f, 0.62f), storm) * (1 + flash);
+            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.55f, 0.63f, 0.8f), new Color(0.4f, 0.3f, 0.58f), storm) * (1 + flash * 0.5f);
             RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.6f, 0.66f, 0.62f), new Color(0.36f, 0.26f, 0.44f), storm);
         }
     }
@@ -225,7 +225,7 @@ namespace AndoBoss
                 var ec = Color.Lerp(Mat.Electro, new Color(1f, 0.35f, 0.7f), phase2);
                 ec.a = 0.7f + 0.3f * Mathf.Sin(time * 3);
                 edgeMat.SetColor("_Color", ec);
-                wallMat.SetColor("_Color", new Color(ec.r, ec.g, ec.b, 0.12f + 0.12f * phase2 + 0.05f * Mathf.Sin(time * 2)));
+                wallMat.SetColor("_Color", new Color(ec.r, ec.g, ec.b, 0.08f + 0.08f * phase2 + 0.03f * Mathf.Sin(time * 2)));
                 wallMat.SetTextureOffset("_MainTex", new Vector2(time * 0.02f, 0));
             }
         }
@@ -263,7 +263,7 @@ namespace AndoBoss
             var lead = Mat.ToonShared(new Color(0.75f, 0.78f, 0.82f), 0.03f);
             Mat.Part(p, Mat.Frustum(0.14f, 0.14f, 3.4f, 8), lead, new Vector3(-0.6f, 1.6f, 0), Vector3.one);
             Mat.Part(p, Mat.Frustum(0.14f, 0.14f, 2.6f, 8), lead, new Vector3(0.6f, 2f, 0), Vector3.one);
-            var halo = Mat.Part(p, Mat.Quad, Mat.Fx(new Color(c.r, c.g, c.b, 0.55f), Mat.SoftGlow, true, 1.6f), new Vector3(0, 6.5f, 0), Vector3.one * 9, default, false);
+            var halo = Mat.Part(p, Mat.Quad, Mat.Fx(new Color(c.r, c.g, c.b, 0.35f), Mat.SoftGlow, true, 1.2f), new Vector3(0, 6.5f, 0), Vector3.one * 7, default, false);
             halo.AddComponent<Billboard>();
         }
 
@@ -272,11 +272,11 @@ namespace AndoBoss
         {
             const int S = 1024;
             var px = new Color32[S * S];
-            var baseC = new Color32(238, 228, 207, 255);
+            var baseC = new Color32(214, 204, 184, 255);
             for (int i = 0; i < px.Length; i++) px[i] = baseC;
-            var trace = new Color32(214, 198, 160, 255);
-            var pad = new Color32(200, 178, 130, 255);
-            var ringC = new Color32(210, 190, 148, 255);
+            var trace = new Color32(186, 168, 128, 255);
+            var pad = new Color32(168, 146, 100, 255);
+            var ringC = new Color32(180, 160, 118, 255);
             float m = S / 2f;
 
             void Dot(float x, float y, float r, Color32 c)
@@ -310,7 +310,7 @@ namespace AndoBoss
                 Dot(x2, y2, 5, baseC);
             }
             // 真ん中に大きな Ω
-            var om = new Color32(196, 172, 122, 255);
+            var om = new Color32(165, 140, 95, 255);
             float fa = -0.15f * Mathf.PI, fb = 1.15f * Mathf.PI;
             Circle(78, 11, om, fa, fb);
             Line(m + Mathf.Cos(fa) * 78, m + Mathf.Sin(fa) * 78, m + Mathf.Cos(fa) * 78 + 40, m + Mathf.Sin(fa) * 78, 11, om);

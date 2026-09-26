@@ -1,4 +1,5 @@
 using System;
+using Random = UnityEngine.Random;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,7 +17,7 @@ namespace AndoBoss
         readonly List<Timer> timers = new List<Timer>();
 
         ParticleSystem sparks, glow, debris, confetti, stars, embers;
-        Mesh disc, flatQuad, wallMesh, beamQuad;
+        Mesh disc, flatQuad, wallMesh, beamQuad, spikeMesh;
 
         // 時間
         float hitStop;          // 実時間でのこり何秒止めるか
@@ -30,6 +31,7 @@ namespace AndoBoss
             flatQuad = Mat.FlatQuad();
             wallMesh = Mat.Frustum(1, 1, 1, 48, false, true);
             beamQuad = Mat.FlatQuad(0, 1);
+            spikeMesh = Mat.Frustum(0.35f, 0f, 1f, 6);
 
             sparks = MakePS("sparks", Mat.Streak, true, 800, ps =>
             {
@@ -331,9 +333,84 @@ namespace AndoBoss
         }
 
         public static Mesh BeamMesh => I.beamQuad;
+        public static Mesh DiscMesh => I.disc;
+
+        // 火柱（杉山くん）
+        public static void Pillar(Vector3 p, Color c, float r, float h, float dur)
+        {
+            if (!I) return;
+            var m = Mat.Fx(c, Mat.WallTex, true, 2.2f);
+            var go = Obj("pillar", I.wallMesh, m, new Vector3(p.x, h / 2, p.z), Quaternion.identity, new Vector3(r, h, r));
+            float t = 0;
+            Run(dt =>
+            {
+                t += dt;
+                float u = Mathf.Clamp01(t / dur);
+                float grow = Mathf.Min(1, t * 8);
+                go.transform.localScale = new Vector3(r * (0.6f + 0.4f * grow) * (1 + Mathf.Sin(t * 40) * 0.04f), h * grow, r * (0.6f + 0.4f * grow));
+                go.transform.position = new Vector3(p.x, h * grow / 2, p.z);
+                go.transform.Rotate(0, 200 * dt, 0);
+                m.SetColor("_Color", new Color(c.r, c.g, c.b, (1 - u * u)));
+                if (Random.value < 0.9f) Embers(p + new Vector3(Random.Range(-r, r) * 0.6f, Random.Range(0, h * 0.7f), Random.Range(-r, r) * 0.6f), c, 2);
+                return u < 1;
+            }, go);
+            Glow(p + Vector3.up, c, 2f);
+        }
+
+        // 爆発（炎）
+        public static void Explosion(Vector3 p, Color c, float size)
+        {
+            Glow(p, c, 1.5f * size);
+            Glow(p, Color.white, 0.8f * size);
+            Sparks(p, c, (int)(18 * size), 1.2f * size);
+            Debris(p, new Color(0.35f, 0.3f, 0.3f, 0.7f), (int)(10 * size));
+            Embers(p, c, (int)(12 * size));
+            Ring(new Vector3(p.x, 0, p.z), 3 * size, c, 0.35f);
+        }
+
+        // 斬撃の線（ともきの元素爆発）。中心を通るランダムな向きの光の線
+        public static void SlashLine(Vector3 center, Color c, float len)
+        {
+            if (!I) return;
+            var m = Mat.Fx(c, Mat.Streak, true, 3.5f);
+            var dir = Random.onUnitSphere;
+            var go = Obj("slash", I.beamQuad, m, center - dir * len / 2, Quaternion.LookRotation(dir), new Vector3(0.35f, 1, len));
+            go.AddComponent<BeamFacer>();
+            float t = 0;
+            Run(dt =>
+            {
+                t += dt;
+                float u = Mathf.Clamp01(t / 0.22f);
+                go.transform.localScale = new Vector3(0.35f * (1 - u) + 0.05f, 1, len * (0.6f + 0.4f * Mathf.Min(1, t * 20)));
+                m.SetColor("_Color", new Color(c.r, c.g, c.b, 1 - u));
+                return u < 1;
+            }, go);
+        }
+
+        // 地面から突き出る氷のとげ（やましょう）
+        public static void IceSpike(Vector3 p, float h)
+        {
+            if (!I) return;
+            var m = Mat.Toon(new Color(0.75f, 0.92f, 1f), 0.02f, new Color(0.5f, 0.85f, 1f, 0.25f));
+            var go = new GameObject("spike");
+            go.transform.position = new Vector3(p.x, 0, p.z);
+            go.transform.rotation = Quaternion.Euler(Random.Range(-18f, 18f), Random.Range(0, 360f), Random.Range(-18f, 18f));
+            var part = Mat.Part(go.transform, I.spikeMesh, m, new Vector3(0, 0.5f, 0), Vector3.one, default, false);
+            _ = part;
+            float t = 0;
+            Run(dt =>
+            {
+                t += dt;
+                float up = Mathf.Min(1, t * 12);
+                float down = t > 1.1f ? Mathf.Clamp01(1 - (t - 1.1f) * 3) : 1;
+                go.transform.localScale = new Vector3(0.6f * down, h * up * down, 0.6f * down);
+                return t < 1.45f;
+            }, go);
+            Debris(new Vector3(p.x, 0.2f, p.z), new Color(0.85f, 0.95f, 1f, 0.8f), 3);
+        }
 
         // 使い捨てのマテリアルを持つエフェクトは、消すときにマテリアルも消す
-        static readonly HashSet<string> OwnMat = new HashSet<string> { "ring", "airring", "bolt", "scorch", "tele", "teleband", "wall", "wallring", "beam" };
+        static readonly HashSet<string> OwnMat = new HashSet<string> { "ring", "airring", "bolt", "scorch", "tele", "teleband", "wall", "wallring", "beam", "pillar", "slash", "spike", "wave3" };
         public static void Kill(GameObject go)
         {
             if (!go) return;

@@ -120,8 +120,12 @@ namespace AndoBoss
             return m;
         }
 
+        // エフェクトの明るさ全体の倍率（まぶしすぎたので下げてある）
+        public static float FxGain = 0.55f;
+
         public static Material Fx(Color c, Texture tex = null, bool additive = true, float intensity = 1f, bool cullOff = true)
         {
+            if (additive) intensity *= FxGain;
             var m = new Material(fxSh);
             m.SetColor("_Color", c);
             m.mainTexture = tex != null ? tex : White;

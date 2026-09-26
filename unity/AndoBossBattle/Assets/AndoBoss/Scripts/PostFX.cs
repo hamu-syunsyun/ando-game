@@ -12,11 +12,17 @@ namespace AndoBoss
         const int MaxIter = 6;
         readonly RenderTexture[] chain = new RenderTexture[MaxIter];
 
-        public float BloomThreshold = 0.82f;
-        public float BloomIntensity = 0.85f;
-        public float BaseSaturation = 1.18f;
-        public float BaseContrast = 1.06f;
-        public float BaseVignette = 0.35f;
+        // 明るいところだけが光るように、しきい値は高め・強さは控えめにしてある
+        public float BloomThreshold = 1.3f;
+        public float BloomIntensity = 0.3f;
+        public float BaseSaturation = 1.08f;
+        public float BaseContrast = 1.04f;
+        public float BaseVignette = 0.3f;
+        public float Exposure = 1.15f;
+
+        // 光の演出の強さ（F2 で切り替え）。0 = 光らない, 1 = 控えめ, 2 = 派手
+        public static int Level = 1;
+        public static readonly string[] LevelNames = { "光の演出：オフ", "光の演出：控えめ", "光の演出：派手" };
 
         // 演出で一時的に足すもの
         float flashA; Color flashC = Color.white; float flashDecay = 4f;
@@ -35,6 +41,8 @@ namespace AndoBoss
 
         public void Flash(Color c, float a, float decay = 4f)
         {
+            // 画面が真っ白になって見えなくならないよう上限をつける
+            a = Mathf.Min(a * (Level == 2 ? 0.7f : 0.4f), Level == 0 ? 0.15f : 0.45f);
             if (a >= flashA) { flashC = c; flashDecay = decay; }
             flashA = Mathf.Max(flashA, a);
         }
@@ -80,14 +88,15 @@ namespace AndoBoss
             }
 
             float pulse = LowHp > 0 ? (0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 6)) * LowHp : 0;
+            float lv = Level == 0 ? 0 : Level == 1 ? 1 : 1.8f;
             mat.SetTexture("_BloomTex", cur);
-            mat.SetFloat("_BloomIntensity", BloomIntensity + extraBloom);
-            mat.SetFloat("_Chroma", 0.25f + chroma * 6f);
-            mat.SetFloat("_RadialBlur", radial);
+            mat.SetFloat("_BloomIntensity", (BloomIntensity + extraBloom * 0.3f) * lv);
+            mat.SetFloat("_Chroma", (0.1f + chroma * 3f) * Mathf.Min(lv, 1));
+            mat.SetFloat("_RadialBlur", radial * Mathf.Min(lv, 1) * 0.7f);
             mat.SetFloat("_Vignette", BaseVignette + pulse * 0.6f);
             mat.SetFloat("_Saturation", BaseSaturation * (1 - desat));
             mat.SetFloat("_Contrast", BaseContrast);
-            mat.SetFloat("_Exposure", 1f);
+            mat.SetFloat("_Exposure", Exposure);
             var tint = Tint;
             if (pulse > 0) tint = Color.Lerp(tint, new Color(1.15f, 0.75f, 0.75f), pulse * 0.5f);
             mat.SetColor("_Tint", tint);

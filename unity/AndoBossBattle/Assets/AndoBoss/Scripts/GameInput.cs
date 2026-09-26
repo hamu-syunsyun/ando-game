@@ -9,7 +9,7 @@ namespace AndoBoss
     // 旧 Input Manager が使えるならそれを使い、新 Input System だけのプロジェクトでも動くようにしてある。
     public static class GameInput
     {
-        public enum K { Up, Down, Left, Right, Attack, Skill, Burst, Dodge, Jump, Confirm, Pause, Retry, Title, Mute, LockOn }
+        public enum K { Up, Down, Left, Right, Attack, Skill, Burst, Dodge, Jump, Confirm, Pause, Retry, Title, Mute, LockOn, Char1, Char2, Char3, Light, Style }
 
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
         static bool Any(params Key[] ks)
@@ -56,6 +56,11 @@ namespace AndoBoss
                 case K.Title: return AnyDown(Key.T);
                 case K.Mute: return AnyDown(Key.M);
                 case K.LockOn: return AnyDown(Key.Tab) || (M != null && M.middleButton.wasPressedThisFrame);
+                case K.Char1: return AnyDown(Key.Digit1, Key.Numpad1);
+                case K.Char2: return AnyDown(Key.Digit2, Key.Numpad2);
+                case K.Char3: return AnyDown(Key.Digit3, Key.Numpad3);
+                case K.Light: return AnyDown(Key.F2);
+                case K.Style: return AnyDown(Key.F3);
             }
             return false;
         }
@@ -105,6 +110,11 @@ namespace AndoBoss
                 case K.Title: return AnyDown(KeyCode.T);
                 case K.Mute: return AnyDown(KeyCode.M);
                 case K.LockOn: return AnyDown(KeyCode.Tab) || Input.GetMouseButtonDown(2);
+                case K.Char1: return AnyDown(KeyCode.Alpha1, KeyCode.Keypad1);
+                case K.Char2: return AnyDown(KeyCode.Alpha2, KeyCode.Keypad2);
+                case K.Char3: return AnyDown(KeyCode.Alpha3, KeyCode.Keypad3);
+                case K.Light: return AnyDown(KeyCode.F2);
+                case K.Style: return AnyDown(KeyCode.F3);
             }
             return false;
         }

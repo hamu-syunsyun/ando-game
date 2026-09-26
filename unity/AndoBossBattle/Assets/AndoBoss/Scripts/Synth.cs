@@ -93,6 +93,40 @@ namespace AndoBoss
             for (int i = 0; i < b.Length; i++) b[i] += wet[i] * mix;
         }
 
+        // 簡単なリバーブ（くし形フィルター4つ＋オールパス2つ）。部屋で鳴っているような広がりを足す
+        public static void Reverb(float[] b, float size = 1f, float mix = 0.25f, float damp = 0.35f)
+        {
+            int[] cd = { 1557, 1617, 1491, 1422 };
+            int[] ad = { 225, 556 };
+            var wet = new float[b.Length];
+            foreach (var d0 in cd)
+            {
+                int d = (int)(d0 * size);
+                var buf = new float[d]; int idx = 0; float lp = 0;
+                for (int i = 0; i < b.Length; i++)
+                {
+                    float y = buf[idx];
+                    lp = y * (1 - damp) + lp * damp;
+                    buf[idx] = b[i] + lp * 0.8f;
+                    idx = (idx + 1) % d;
+                    wet[i] += y * 0.25f;
+                }
+            }
+            foreach (var d0 in ad)
+            {
+                var buf = new float[d0]; int idx = 0;
+                for (int i = 0; i < b.Length; i++)
+                {
+                    float bo = buf[idx];
+                    float y = -wet[i] + bo;
+                    buf[idx] = wet[i] + bo * 0.5f;
+                    idx = (idx + 1) % d0;
+                    wet[i] = y;
+                }
+            }
+            for (int i = 0; i < b.Length; i++) b[i] += wet[i] * mix;
+        }
+
         public static void Add(float[] dst, float[] src, int offset, float gain)
         {
             for (int i = 0; i < src.Length && offset + i < dst.Length; i++)

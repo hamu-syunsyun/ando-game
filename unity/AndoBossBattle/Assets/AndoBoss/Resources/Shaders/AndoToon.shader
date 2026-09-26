@@ -36,6 +36,8 @@ Shader "AndoBoss/Toon"
             fixed4 _Color, _ShadeColor, _RimColor, _SpecColor2, _Emission, _FlashColor;
             sampler2D _MainTex; float4 _MainTex_ST;
             half _RimPower, _Flash;
+            // 画風（0 = アニメ調, 1 = リアル調）。スクリプトから全体に設定する
+            float _AndoRealism;
 
             struct v2f
             {
@@ -65,24 +67,34 @@ Shader "AndoBoss/Toon"
                 float3 n = normalize(i.wn);
                 float3 l = normalize(_WorldSpaceLightPos0.xyz);
                 float3 v = normalize(_WorldSpaceCameraPos - i.wp);
+                float3 h = normalize(l + v);
                 float atten = SHADOW_ATTENUATION(i);
+                float3 sh = ShadeSH9(float4(n, 1));
+
+                // --- アニメ調：3段階のセル陰影＋リムライト ---
                 float ndl = dot(n, l) * 0.5 + 0.5;
                 float lit = ndl * lerp(0.35, 1, atten);
-                // 3段階のセル陰影（境界は少しだけぼかす）
                 float band = smoothstep(0.46, 0.5, lit) * 0.55 + smoothstep(0.7, 0.74, lit) * 0.45;
                 float3 shade = lerp(_ShadeColor.rgb, 1, band);
-                float3 col = albedo.rgb * shade * (_LightColor0.rgb * 0.75 + 0.25);
-                col += albedo.rgb * ShadeSH9(float4(n, 1)) * 0.45;
-                // ハイライト
-                float3 h = normalize(l + v);
-                float spec = smoothstep(0.93, 0.95, dot(n, h)) * atten;
-                col += _SpecColor2.rgb * _SpecColor2.a * spec;
-                // リムライト（光の当たる側を強めに）
+                float3 toon = albedo.rgb * shade * (_LightColor0.rgb * 0.7 + 0.2);
+                toon += albedo.rgb * sh * 0.35;
+                toon += _SpecColor2.rgb * _SpecColor2.a * smoothstep(0.93, 0.95, dot(n, h)) * atten;
                 float rim = pow(1 - saturate(dot(n, v)), _RimPower);
                 rim = smoothstep(0.35, 0.6, rim) * (0.45 + 0.55 * ndl);
-                col += _RimColor.rgb * _RimColor.a * rim;
-                col += _Emission.rgb * _Emission.a * 4;
-                col = lerp(col, _FlashColor.rgb * 1.6, _Flash);
+                toon += _RimColor.rgb * _RimColor.a * rim * 0.6;
+
+                // --- リアル調：なめらかな陰影＋つや＋弱いふち光 ---
+                float nl = saturate(dot(n, l));
+                float wrap = saturate((dot(n, l) + 0.2) / 1.2);
+                float3 real = albedo.rgb * (_LightColor0.rgb * wrap * lerp(0.25, 1, atten) * 0.9 + sh * 0.75);
+                float gloss = pow(saturate(dot(n, h)), 40) * 0.35 + pow(saturate(dot(n, h)), 8) * 0.06;
+                real += _LightColor0.rgb * gloss * atten * (0.5 + 0.5 * nl);
+                float fres = pow(1 - saturate(dot(n, v)), 4);
+                real += sh * fres * 0.25;
+
+                float3 col = lerp(toon, real, _AndoRealism);
+                col += _Emission.rgb * _Emission.a * 1.6;
+                col = lerp(col, _FlashColor.rgb * 1.1, _Flash);
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return fixed4(col, 1);
             }
@@ -101,11 +113,13 @@ Shader "AndoBoss/Toon"
             #include "UnityCG.cginc"
             fixed4 _OutlineColor, _FlashColor;
             half _OutlineWidth, _Flash;
+            float _AndoRealism;
             struct v2f { float4 pos : SV_POSITION; UNITY_FOG_COORDS(0) };
             v2f vert(appdata_base v)
             {
                 v2f o;
-                float3 p = v.vertex.xyz + normalize(v.normal) * _OutlineWidth;
+                float w = _OutlineWidth * (1 - _AndoRealism * 0.75);
+                float3 p = v.vertex.xyz + normalize(v.normal) * w;
                 o.pos = UnityObjectToClipPos(float4(p, 1));
                 if (_OutlineWidth <= 0.0001) o.pos = float4(0, 0, -2, 1);
                 UNITY_TRANSFER_FOG(o, o.pos);

@@ -8,25 +8,27 @@ namespace AndoBoss
     // ボス：電気回路担当・安東先生（架空の人物）
     public class Boss : MonoBehaviour
     {
-        public const float MaxHp = 3000f;
+        public const float MaxHp = 9000f;
         public const float Radius = 1.7f;
-        public const float MaxTough = 700f;
+        public const float MaxTough = 1500f;
 
         public Vector3 Pos;
-        public float Y, Face, Hp, LagHp, Tough, BreakT, Flash, SinkT;
+        public float Y, Face, Hp, LagHp, Tough, BreakT, Flash, SinkT, FreezeT;
+        public Elem Aura; public float AuraT;
         public int Phase = 1;
         public bool Alive => Hp > 0;
         public bool Broken => BreakT > 0;
         public bool PendingPhase;
         public string Pose = "idle";
         bool said75, said25, lockFace, walking;
+        float sansouCd = 20f, practiceCd;
         float restT, animT, walkT;
         string lastAtk;
         Func<float, bool> atk;
 
         // 見た目
         Transform inner, armL, armR, legL, legR, headT, bookOrbit, stickTip;
-        GameObject aura, dizzy;
+        GameObject aura, dizzy, iceBlock;
         Material auraMat, eyeGlow;
         readonly List<Material> mats = new List<Material>();
         ParticleSystem auraPs;
@@ -39,7 +41,7 @@ namespace AndoBoss
             var suit = M(new Color(0.23f, 0.25f, 0.3f));
             var shirt = M(new Color(0.96f, 0.96f, 0.96f));
             var tie = M(new Color(0.75f, 0.22f, 0.18f));
-            var hairM = M(new Color(0.32f, 0.32f, 0.34f));
+            var hairM = M(new Color(0.93f, 0.93f, 0.95f)); // 白髪（はげてはいない）
             var black = M(new Color(0.12f, 0.12f, 0.12f), 0);
 
             legL = Mat.Pivot(inner, "legL", new Vector3(-0.4f, 1.4f, 0));
@@ -59,7 +61,12 @@ namespace AndoBoss
             headT = Mat.Pivot(inner, "head", new Vector3(0, 3.3f, 0));
             Mat.Part(headT, Mat.Sphere, skin, new Vector3(0, 0.8f, 0), Vector3.one * 1.9f);
             // 髪（頭頂は少し薄め、横は厚め）
-            Mat.Part(headT, Mat.Sphere, hairM, new Vector3(0, 0.95f, -0.12f), new Vector3(1.96f, 1.6f, 1.9f));
+            Mat.Part(headT, Mat.Sphere, hairM, new Vector3(0, 0.98f, -0.1f), new Vector3(2.02f, 1.7f, 1.98f));
+            // 前髪とふくらみ（ふさふさの白髪）
+            for (int i = -3; i <= 3; i++)
+                Mat.Part(headT, Mat.Sphere, hairM, new Vector3(i * 0.24f, 1.62f - Mathf.Abs(i) * 0.06f, 0.55f - Mathf.Abs(i) * 0.08f), new Vector3(0.5f, 0.42f, 0.4f), new Vector3(20, 0, i * -8));
+            for (int i = 0; i < 5; i++)
+                Mat.Part(headT, Mat.Sphere, hairM, new Vector3((i - 2) * 0.35f, 1.35f, -0.75f), new Vector3(0.6f, 0.8f, 0.5f));
             foreach (float x in new[] { -0.85f, 0.85f })
                 Mat.Part(headT, Mat.Sphere, hairM, new Vector3(x, 0.75f, -0.1f), new Vector3(0.42f, 0.7f, 0.7f));
             // メガネ
@@ -68,7 +75,7 @@ namespace AndoBoss
             {
                 Mat.Part(headT, frameMesh, black, new Vector3(x, 0.82f, 0.86f), Vector3.one, default, false);
                 Mat.Part(headT, Mat.Sphere, black, new Vector3(x, 0.8f, 0.84f), Vector3.one * 0.14f, default, false);
-                Mat.Part(headT, Mat.Cube, black, new Vector3(x, 1.15f, 0.84f), new Vector3(0.34f, 0.07f, 0.07f), new Vector3(0, 0, x < 0 ? -20 : 20), false);
+                Mat.Part(headT, Mat.Cube, M(new Color(0.8f, 0.8f, 0.82f), 0), new Vector3(x, 1.15f, 0.84f), new Vector3(0.36f, 0.09f, 0.08f), new Vector3(0, 0, x < 0 ? -20 : 20), false);
             }
             // レンズの光（第2形態で赤く光る）
             eyeGlow = Mat.Fx(new Color(1, 0.2f, 0.2f, 0), Mat.Glow, true, 3f);
@@ -138,6 +145,19 @@ namespace AndoBoss
             }
             dizzy.SetActive(false);
 
+            // 絶対零度の氷づけ
+            iceBlock = new GameObject("ice");
+            iceBlock.transform.SetParent(transform, false);
+            var iceM = Mat.Fx(new Color(0.6f, 0.9f, 1f, 0.35f), Mat.White, false, 1f);
+            var iceE = Mat.Fx(new Color(0.7f, 0.95f, 1f, 0.5f), Mat.WallTex, true, 1.5f);
+            for (int i = 0; i < 5; i++)
+            {
+                var sc = new Vector3(Random.Range(1.6f, 2.4f), Random.Range(3f, 5.5f), Random.Range(1.6f, 2.4f));
+                Mat.Part(iceBlock.transform, Mat.Cube, iceM, new Vector3(Random.Range(-0.8f, 0.8f), sc.y / 2, Random.Range(-0.8f, 0.8f)), sc, new Vector3(Random.Range(-10, 10), Random.Range(0, 90), Random.Range(-10, 10)), false);
+            }
+            Mat.Part(iceBlock.transform, Mat.Frustum(1, 1, 1, 24, false, true), iceE, new Vector3(0, 2.8f, 0), new Vector3(2.3f, 5.6f, 2.3f), default, false);
+            iceBlock.SetActive(false);
+
             var blob = Mat.Part(transform, Mat.Disc(32), Mat.Fx(new Color(0, 0, 0, 0.4f), Mat.SoftGlow, false), new Vector3(0, 0.03f, 0), new Vector3(2.4f, 1, 2.4f), default, false);
             blob.name = "blob";
         }
@@ -161,10 +181,11 @@ namespace AndoBoss
         public void ResetState()
         {
             Pos = new Vector3(0, 0, 7); Y = 0; Face = Mathf.PI; Hp = MaxHp; LagHp = MaxHp; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
-            Phase = 1; PendingPhase = false; Pose = "idle"; said75 = said25 = false; lockFace = false; walking = false;
+            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; Aura = Elem.None; AuraT = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
             restT = 1.2f; lastAtk = null; atk = null;
             aura.SetActive(false);
             dizzy.SetActive(false);
+            iceBlock.SetActive(false);
             auraPs.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             eyeGlow.SetColor("_Color", new Color(1, 0.2f, 0.2f, 0));
             inner.localRotation = Quaternion.identity;
@@ -178,8 +199,8 @@ namespace AndoBoss
             Flash = 0.12f;
             float r = Hp / MaxHp;
             if (Phase == 1 && r <= 0.5f) PendingPhase = true;
-            if (!said75 && r <= 0.75f) { said75 = true; Game.I.Say("まだ単位はあげられませんよ。"); }
-            if (!said25 && r <= 0.25f) { said25 = true; Game.I.Say("……なかなか、やりますね。"); }
+            if (!said75 && r <= 0.75f) { said75 = true; Game.I.Say("まだまだ単位はやれねど。"); }
+            if (!said25 && r <= 0.25f) { said25 = true; Game.I.Say("……なかなか、やるでねが。"); }
             if (!Broken && Hp > 0)
             {
                 Tough -= toughDmg;
@@ -200,6 +221,7 @@ namespace AndoBoss
         public void Die()
         {
             atk = null; Pose = "defeat"; BreakT = 0; dizzy.SetActive(false);
+            FreezeT = 0; iceBlock.SetActive(false);
             auraPs.Stop();
         }
 
@@ -224,6 +246,16 @@ namespace AndoBoss
                 return;
             }
 
+            AuraT -= dt;
+            if (AuraT <= 0) Aura = Elem.None;
+            if (FreezeT > 0)
+            {
+                // 氷づけ：何もできない
+                FreezeT -= dt;
+                if (FreezeT <= 0) Freeze(0);
+                Animate(0);
+                return;
+            }
             if (BreakT > 0)
             {
                 BreakT -= dt;
@@ -231,10 +263,11 @@ namespace AndoBoss
                 if (BreakT <= 0)
                 {
                     Tough = MaxTough * (Phase == 2 ? 1.2f : 1f);
+                    Aura = Elem.None;
                     dizzy.SetActive(false);
                     Pose = "idle";
                     restT = 0.6f;
-                    G.Say("……今のは見なかったことにします。");
+                    G.Say("……今のは見ねがったことにするがらな。");
                 }
                 Animate(dt);
                 return;
@@ -262,6 +295,7 @@ namespace AndoBoss
                 return;
             }
             restT -= dt;
+            sansouCd -= dt;
             walking = false;
             if (d > 6)
             {
@@ -271,8 +305,10 @@ namespace AndoBoss
             }
             if (restT <= 0)
             {
-                var opts = new List<string> { "lightning", "shots", "slam", "charge" };
-                if (Phase == 2) { opts.Add("laser"); opts.Add("spiral"); opts.Add("laser"); }
+                var opts = new List<string> { "lightning", "shots", "slam", "iyaiya", "trans" };
+                if (Phase == 2) { opts.Add("laser"); opts.Add("spiral"); opts.Add("iyaiya"); }
+                // 必殺「三相交流」はしばらく間をあけて使う
+                if (sansouCd <= 0) { opts.Clear(); opts.Add("sansou"); }
                 opts.RemoveAll(k => k == lastAtk);
                 var pick = opts[Random.Range(0, opts.Count)];
                 lastAtk = pick;
@@ -282,7 +318,9 @@ namespace AndoBoss
                     case "lightning": atk = AtkLightning(); break;
                     case "shots": atk = AtkShots(); break;
                     case "slam": atk = AtkSlam(); break;
-                    case "charge": atk = AtkCharge(); break;
+                    case "iyaiya": atk = AtkIyaiya(); break;
+                    case "trans": atk = AtkTrans(); break;
+                    case "sansou": atk = AtkSansou(); sansouCd = Phase == 2 ? 16f : 26f; break;
                     case "laser": atk = AtkLaser(); break;
                     default: atk = AtkSpiral(); break;
                 }
@@ -290,15 +328,32 @@ namespace AndoBoss
             Animate(dt);
         }
 
+        // セリフは全部秋田弁
         static readonly Dictionary<string, string[]> Lines = new Dictionary<string, string[]>
         {
-            { "lightning", new[] { "抜き打ち小テストです。", "雷に打たれたように覚えなさい。" } },
-            { "shots", new[] { "抵抗は無駄です。", "カラーコード、読めますか？" } },
-            { "slam", new[] { "再履修です！", "跳んでよけなさい！" } },
-            { "charge", new[] { "遅刻は認めません！", "廊下を走ってはいけません……私以外は。" } },
-            { "laser", new[] { "オームの法則ビーム！", "V ＝ I R、覚えましたね？" } },
-            { "spiral", new[] { "キルヒホッフの渦です。", "電流は、流れ込んだ分だけ流れ出るのです。" } },
+            { "lightning", new[] { "抜き打ちの小テストだど！", "雷さ打たれだみてぇに覚えれ！" } },
+            { "shots", new[] { "抵抗したって無駄だど。", "カラーコード、読めるが？" } },
+            { "slam", new[] { "再履修だ！", "跳んでよげれ！" } },
+            { "iyaiya", new[] { "いやいやいやいや！！", "いやいや、そうでねって！", "いやいやいや、違うべ！" } },
+            { "trans", new[] { "トランスで電圧下げでやる！", "足、重ぐなったべ？" } },
+            { "sansou", new[] { "必殺、三相交流！！", "120度ずつずれでるの、わがるが？" } },
+            { "laser", new[] { "オームの法則ビームだ！", "V＝IR、覚えだべ？" } },
+            { "spiral", new[] { "キルヒホッフの渦だ。", "入った電流は、ちゃんと出でいぐんだど。" } },
         };
+
+        // 攻撃が当たったときに、たまに言う
+        public void OnHitPlayer()
+        {
+            if (Time.time < practiceCd) return;
+            if (Random.value < 0.35f) { practiceCd = Time.time + 9; Game.I.Say("練習問題と同じでねが！"); }
+        }
+
+        public void Freeze(float sec)
+        {
+            FreezeT = sec;
+            if (sec > 0) { atk = null; lockFace = false; Y = 0; Pose = "idle"; }
+            iceBlock.SetActive(sec > 0);
+        }
         static string Pick(string k) { var a = Lines[k]; return a[Random.Range(0, a.Length)]; }
 
         Func<float, bool> AtkLightning()
@@ -399,45 +454,193 @@ namespace AndoBoss
             });
         }
 
-        Func<float, bool> AtkCharge()
+        // いやいや攻撃：首を横にふりながら、ドタバタ暴れて跳ね回る
+        Func<float, bool> AtkIyaiya()
         {
             var G = Game.I;
-            G.Say(Pick("charge"));
-            Pose = "charge";
-            var P = G.Player;
-            var dir = Player.Flat(P.Pos - Pos);
-            dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector3.forward;
-            float len = 24, width = 3.4f;
-            Fx.TelegraphBand(Pos, dir, len, width, 0.9f);
-            Sfx.Play("warn", 0.5f, 0.8f);
-            Face = Mathf.Atan2(dir.x, dir.z);
-            lockFace = true;
-            float t = 0, travelled = 0; bool hit = false, started = false;
+            G.Say(Pick("iyaiya"));
+            Pose = "iyaiya";
+            int hops = Phase == 2 ? 6 : 4;
+            float hopDur = Phase == 2 ? 0.46f : 0.58f;
+            int done = 0; float t = 0;
+            Vector3 from = Pos, to = Pos;
+            void NextHop()
+            {
+                from = Pos;
+                var pp = Player.Flat(Game.I.Player.Pos) + new Vector3(Random.Range(-1.5f, 1.5f), 0, Random.Range(-1.5f, 1.5f));
+                var d = pp - Player.Flat(Pos);
+                if (d.magnitude > 7) d = d.normalized * 7;
+                to = ClampArena(Player.Flat(Pos) + d);
+                Fx.TelegraphCircle(to, 3.8f, 0, hopDur - 0.04f, null);
+                if (Random.value < 0.5f) Game.I.Hud.WorldText(Pos + Vector3.up * 6, "いやいや！", new Color(1f, 0.6f, 0.6f), 0.9f);
+            }
+            NextHop();
             return dt =>
             {
                 t += dt;
-                if (t > 0.9f && travelled < len)
+                float u = Mathf.Clamp01(t / hopDur);
+                Pos = Vector3.Lerp(from, to, u);
+                Y = Mathf.Sin(u * Mathf.PI) * 2.2f;
+                if (u > 0.05f) Face = Mathf.Atan2(to.x - from.x, to.z - from.z) + Mathf.Sin(animT * 20) * 0.4f;
+                lockFace = true;
+                if (u >= 1)
                 {
-                    if (!started) { started = true; Sfx.Play("rumble", 1f); }
-                    float step = 30 * dt;
-                    travelled += step;
-                    Pos += dir * step;
-                    var f = Player.Flat(Pos);
-                    if (f.magnitude > World.ArenaR - 2)
-                    {
-                        var c = f.normalized * (World.ArenaR - 2);
-                        Pos = new Vector3(c.x, 0, c.z);
-                        travelled = len;
-                        Game.I.Cam.Shake(0.4f);
-                        Sfx.Play("boom", 0.6f);
-                    }
+                    Y = 0;
+                    Sfx.Play("stomp", 1f, Random.Range(0.9f, 1.1f));
+                    Game.I.Cam.Shake(0.35f);
+                    Fx.Debris(Pos + Vector3.up * 0.3f, new Color(0.8f, 0.75f, 0.64f), 14);
+                    Fx.Ring(Pos, 4.2f, Color.white, 0.25f);
                     var pp = Game.I.Player.Pos;
-                    if (!hit && Player.Flat(pp - Pos).magnitude < Radius + 0.7f && pp.y < 2) hit = Game.I.Player.TakeHit(220);
-                    if (Random.value < 0.6f) Fx.Debris(Pos + Vector3.up * 0.3f, new Color(0.8f, 0.75f, 0.64f), 2);
+                    if (Player.Flat(pp - Pos).magnitude < 3.8f && pp.y < 1.5f) Game.I.Player.TakeHit(150);
+                    done++; t = 0;
+                    if (done >= hops) { lockFace = false; return false; }
+                    NextHop();
                 }
-                if (t > 2.0f) { lockFace = false; return false; }
                 return true;
             };
+        }
+
+        // トランス攻撃：変圧器を投げる。磁気の波に当たると移動速度が下がる
+        Func<float, bool> AtkTrans()
+        {
+            var G = Game.I;
+            G.Say(Pick("trans"));
+            Pose = "point";
+            var target = ClampArena(Player.Flat(G.Player.Pos));
+            var start = StickTip;
+            const float fly = 1.0f;
+            Fx.TelegraphCircle(target, 3.2f, 0, fly, null);
+            Sfx.Play("whoosh", 0.8f, 0.6f);
+            var tr = new GameObject("trans");
+            var core = Mat.ToonShared(new Color(0.35f, 0.37f, 0.4f), 0.03f);
+            var coil = Mat.ToonShared(new Color(0.8f, 0.45f, 0.2f), 0.03f);
+            Mat.Part(tr.transform, Mat.Cube, core, new Vector3(0, 0.6f, 0), new Vector3(1.4f, 1.2f, 0.5f), default, true);
+            Mat.Part(tr.transform, Mat.Frustum(0.32f, 0.32f, 0.9f, 14), coil, new Vector3(-0.42f, 0.6f, 0), Vector3.one, default, true);
+            Mat.Part(tr.transform, Mat.Frustum(0.32f, 0.32f, 0.9f, 14), coil, new Vector3(0.42f, 0.6f, 0), Vector3.one, default, true);
+            var glowM = Mat.Fx(new Color(0.4f, 1f, 0.6f, 0.7f), Mat.Glow, true, 2.5f);
+            var glow = Mat.Part(tr.transform, Mat.Quad, glowM, new Vector3(0, 0.8f, 0), Vector3.one * 3, default, false);
+            glow.AddComponent<Billboard>();
+            tr.transform.position = start;
+            float t = 0; bool landed = false; int pulses = 0;
+            Fx.Run(dt =>
+            {
+                t += dt;
+                if (!landed)
+                {
+                    float u = Mathf.Clamp01(t / fly);
+                    tr.transform.position = Vector3.Lerp(start, target, u) + Vector3.up * Mathf.Sin(u * Mathf.PI) * 5;
+                    tr.transform.Rotate(300 * dt, 200 * dt, 0);
+                    if (u >= 1)
+                    {
+                        landed = true; t = 0;
+                        tr.transform.rotation = Quaternion.Euler(0, Random.Range(0, 360f), 0);
+                        tr.transform.position = target;
+                        Sfx.Play("stomp", 0.8f, 1.2f);
+                        Sfx.Play("trans", 0.8f);
+                        Fx.Debris(target + Vector3.up * 0.3f, new Color(0.8f, 0.75f, 0.64f), 10);
+                        var pp = Game.I.Player.Pos;
+                        if (Player.Flat(pp - target).magnitude < 3.2f && pp.y < 1.5f && Game.I.Player.TakeHit(90)) Game.I.ApplySlow(5f);
+                    }
+                    return true;
+                }
+                glowM.SetColor("_Color", new Color(0.4f, 1f, 0.6f, 0.4f + 0.3f * Mathf.Sin(t * 20)));
+                if (pulses < 2 && t > 0.2f + pulses * 0.8f)
+                {
+                    pulses++;
+                    Sfx.Play("wave", 0.6f, 1.4f);
+                    bool hit = false;
+                    float r = 0.5f;
+                    var ringM = Mat.Fx(new Color(0.4f, 1f, 0.6f, 1f), Mat.RingTex, true, 3f);
+                    var ring = Fx.Obj("ring", Fx.DiscMesh, ringM, target + Vector3.up * 0.1f, Quaternion.identity, Vector3.one);
+                    Fx.Run(dt2 =>
+                    {
+                        r += 9 * dt2;
+                        ring.transform.localScale = new Vector3(r / 0.86f, 1, r / 0.86f);
+                        ringM.SetColor("_Color", new Color(0.4f, 1f, 0.6f, Mathf.Clamp01(1 - r / 7)));
+                        var pp = Game.I.Player.Pos;
+                        float d = Player.Flat(pp - target).magnitude;
+                        if (!hit && Mathf.Abs(d - r) < 0.7f && pp.y < 0.8f) { hit = true; if (Game.I.Player.TakeHit(80)) Game.I.ApplySlow(5f); }
+                        return r < 7;
+                    }, ring);
+                }
+                return t < 2.2f;
+            }, tr);
+            float at = 0;
+            return dt => (at += dt) < 1.5f;
+        }
+
+        // 必殺「三相交流」：120度ずつずれた3本の正弦波を撃ち出す
+        Func<float, bool> AtkSansou()
+        {
+            var G = Game.I;
+            G.Say(Pick("sansou"), 3f);
+            G.OnSansou();
+            Pose = "raise";
+            lockFace = true;
+            Sfx.Play("warn", 0.7f, 0.9f);
+            Sfx.Play("hum3", 0.9f);
+            Color[] cols = { new Color(1f, 0.3f, 0.3f), new Color(1f, 0.85f, 0.25f), new Color(0.35f, 0.6f, 1f) };
+            float t = 0, emit = 0;
+            float aim = 0;
+            float[] dirs = Phase == 2 ? new[] { -0.55f, 0f, 0.55f } : new[] { 0f };
+            return dt =>
+            {
+                t += dt;
+                if (t < 1.2f)
+                {
+                    var P = Game.I.Player;
+                    aim = Mathf.Atan2(P.Pos.x - Pos.x, P.Pos.z - Pos.z);
+                    Face = aim;
+                    for (int k = 0; k < 3; k++)
+                        if (Random.value < 0.5f) Fx.Embers(StickTip + Random.insideUnitSphere * 0.6f, cols[k], 1);
+                    return true;
+                }
+                Pose = "point";
+                if (t < 1.2f + 2.6f)
+                {
+                    // 狙いはゆっくりプレイヤーを追う
+                    var P = Game.I.Player;
+                    aim = Player.TurnTo(aim, Mathf.Atan2(P.Pos.x - Pos.x, P.Pos.z - Pos.z), dt * 0.6f);
+                    Face = aim;
+                    emit -= dt;
+                    if (emit <= 0)
+                    {
+                        emit = 0.075f;
+                        foreach (var off in dirs)
+                            for (int k = 0; k < 3; k++) WaveShot(aim + off, k * Mathf.PI * 2 / 3, cols[k]);
+                    }
+                    return true;
+                }
+                lockFace = false;
+                return t < 4.4f;
+            };
+        }
+
+        void WaveShot(float angle, float phase, Color c)
+        {
+            var g = new GameObject("bullet");
+            var glow = Mat.Part(g.transform, Mat.Quad, Mat.FxShared(new Color(c.r, c.g, c.b, 1f), Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 1.1f, default, false);
+            glow.AddComponent<Billboard>();
+            var core = Mat.Part(g.transform, Mat.Quad, Mat.FxShared(Color.white, Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 0.4f, default, false);
+            core.AddComponent<Billboard>();
+            var fwd = new Vector3(Mathf.Sin(angle), 0, Mathf.Cos(angle));
+            var side = new Vector3(fwd.z, 0, -fwd.x);
+            var origin = new Vector3(Pos.x, 1.1f, Pos.z) + fwd * 1.8f;
+            const float A = 2.4f, lambda = 9f, speed = 10f;
+            float s = 0;
+            Fx.Run(dt =>
+            {
+                if (g == null) return false;
+                s += speed * dt;
+                var p = origin + fwd * s + side * (A * Mathf.Sin(2 * Mathf.PI * s / lambda + phase));
+                g.transform.position = p;
+                var P = Game.I.Player;
+                if (new Vector2(p.x - P.Pos.x, p.z - P.Pos.z).magnitude < 0.6f && P.Pos.y < 1.6f)
+                {
+                    if (P.TakeHit(110)) { Fx.Sparks(p, c, 8, 0.8f); return false; }
+                }
+                return s < 34 && Alive;
+            }, g);
         }
 
         // 第2形態：指示棒から極太ビームを出して薙ぎ払う
@@ -542,7 +745,7 @@ namespace AndoBoss
         Func<float, bool> AtkRoar()
         {
             var G = Game.I;
-            G.Say("……本気を出しましょう。", 2.6f);
+            G.Say("おれ、もう知らねがらな！", 2.6f);
             Pose = "roar";
             aura.SetActive(true);
             auraPs.Play();
@@ -605,7 +808,7 @@ namespace AndoBoss
             if (bookOrbit) bookOrbit.GetChild(0).localRotation = Quaternion.Euler(Mathf.Sin(animT * 2) * 15, 90, 0);
 
             Quaternion aL = Quaternion.Euler(0, 0, -6), aR = Quaternion.Euler(0, 0, 6);
-            float lean = 0, lL = 0, lR = 0, sink = 0, headTilt = 0, spinBody = 0;
+            float lean = 0, lL = 0, lR = 0, sink = 0, headTilt = 0, spinBody = 0, headYaw = 0;
             float breath = Mathf.Sin(animT * 2) * 0.04f;
 
             switch (Pose)
@@ -616,7 +819,13 @@ namespace AndoBoss
                     aL = Quaternion.Euler(0, 0, -160); aR = Quaternion.Euler(0, 0, 160);
                     if (Y <= 0.01f) { aL = Quaternion.Euler(-40, 0, -40); aR = Quaternion.Euler(-40, 0, 40); lean = 20; sink = -0.3f; }
                     break;
-                case "charge": lean = 30; aL = Quaternion.Euler(50, 0, -15); aR = Quaternion.Euler(50, 0, 15); walkT += dt * 20; lL = Mathf.Sin(walkT) * 45; lR = -lL; break;
+                case "iyaiya":
+                    // 首を横にぶんぶん振って、手足をばたばた
+                    headYaw = Mathf.Sin(animT * 24) * 35;
+                    aL = Quaternion.Euler(Mathf.Sin(animT * 23) * 80, 0, -70 + Mathf.Sin(animT * 17) * 50);
+                    aR = Quaternion.Euler(Mathf.Cos(animT * 21) * 80, 0, 70 + Mathf.Cos(animT * 19) * 50);
+                    lL = Mathf.Sin(animT * 26) * 40; lR = -lL; lean = Mathf.Sin(animT * 13) * 10;
+                    break;
                 case "spin": aL = Quaternion.Euler(0, 0, -90); aR = Quaternion.Euler(0, 0, 90); break;
                 case "roar": aL = Quaternion.Euler(-30, 0, -110); aR = Quaternion.Euler(-30, 0, 110); lean = -12; headTilt = -20; break;
                 case "dizzy":
@@ -651,7 +860,7 @@ namespace AndoBoss
             legR.localRotation = Quaternion.Slerp(legR.localRotation, Quaternion.Euler(lR, 0, 0), k);
             inner.localRotation = Quaternion.Slerp(inner.localRotation, Quaternion.Euler(lean, spinBody, 0), k);
             inner.localPosition = new Vector3(0, Mathf.Lerp(inner.localPosition.y, sink + breath, k), 0);
-            headT.localRotation = Quaternion.Slerp(headT.localRotation, Quaternion.Euler(headTilt, 0, Mathf.Sin(animT * 1.3f) * 3), k);
+            headT.localRotation = Quaternion.Slerp(headT.localRotation, Quaternion.Euler(headTilt, headYaw, Mathf.Sin(animT * 1.3f) * 3), Pose == "iyaiya" ? 1 : k);
 
             // 被弾フラッシュ・第2形態の光
             Color fc = Broken ? new Color(1f, 0.85f, 0.4f) : Color.white;

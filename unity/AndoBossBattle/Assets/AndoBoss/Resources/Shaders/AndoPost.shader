@@ -85,13 +85,13 @@ Shader "Hidden/AndoBoss/Post"
                 }
                 col += tex2D(_BloomTex, uv).rgb * _BloomIntensity;
                 col *= _Exposure;
+                // フィルム調のトーンマップ（明るいところが白く飛ばないようにする）
+                col = saturate((col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14));
                 // 色調（彩度・コントラスト・色味）
                 half l = dot(col, half3(0.299, 0.587, 0.114));
                 col = lerp(l.xxx, col, _Saturation);
                 col = (col - 0.5) * _Contrast + 0.5;
                 col *= _Tint.rgb;
-                // 明るいところが白飛びしすぎないようにゆるくトーンマップ
-                col = col / (1 + max(0, col - 1) * 0.5);
                 half v = saturate(1 - dot(dc, dc) * _Vignette * 2.2);
                 col *= lerp(0.25, 1, v);
                 col = lerp(col, _Flash.rgb, _Flash.a);

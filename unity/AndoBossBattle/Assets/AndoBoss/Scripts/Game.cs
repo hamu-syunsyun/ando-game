@@ -10,21 +10,30 @@ namespace AndoBoss
         public enum HitKind { Normal, Skill, Burst }
 
         public Mode State { get; private set; }
-        public Player Player;
+        public Player[] Party;
+        int active;
+        public int Active => active;
+        public Player Player => Party[active];
         public Boss Boss;
         public CameraRig Cam;
         public Hud Hud;
         public Music Music;
 
-        public const float TimeLimit = 180f;
+        public const float TimeLimit = 210f;
         public float TimeLeft;
-        public int Dealt, Combo, MaxCombo, Perfects;
-        float comboT, stateT, titleOrbit;
+        public int Dealt, Combo, MaxCombo, Perfects, Reactions;
+        // パーティ共通のHP・スタミナ・デバフ
+        public float PartyHp = Player.MaxHp, PartyStam = 100, StamDelay, SlowT;
+        float comboT, stateT, titleOrbit, swapCd;
         bool paused;
         public bool Cinematic;
         bool win; string loseReason;
         bool energyAnnounced;
         const string BestKey = "ando_boss_best";
+
+        // 画風：0 = アニメ調, 1 = リアル調（F3 で切り替え）
+        public static int Style = 1;
+        float realism = 1;
 
         // どのシーンで再生しても、これが無ければ自動で作る
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -40,10 +49,14 @@ namespace AndoBoss
             Application.targetFrameRate = 60;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
-            // シーンに最初からあるカメラ・ライト・リスナーは止める（全部こちらで用意する）
             foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None)) c.gameObject.SetActive(false);
             foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) if (l.type == LightType.Directional) l.gameObject.SetActive(false);
             foreach (var a in FindObjectsByType<AudioListener>(FindObjectsSortMode.None)) a.enabled = false;
+
+            Style = PlayerPrefs.GetInt("ando_style", 1);
+            PostFX.Level = PlayerPrefs.GetInt("ando_light", 1);
+            realism = Style;
+            Shader.SetGlobalFloat("_AndoRealism", realism);
 
             Mat.Init();
             var worldRoot = new GameObject("World").transform;
@@ -61,8 +74,12 @@ namespace AndoBoss
             Hud = gameObject.AddComponent<Hud>();
             Hud.Build();
 
-            Player = new GameObject("Player").AddComponent<Player>();
-            Player.Build();
+            Party = new Player[CharDef.All.Length];
+            for (int i = 0; i < Party.Length; i++)
+            {
+                Party[i] = new GameObject("Player_" + CharDef.All[i].Name).AddComponent<Player>();
+                Party[i].Build(CharDef.All[i]);
+            }
             Boss = new GameObject("Boss").AddComponent<Boss>();
             Boss.Build();
 
@@ -74,11 +91,15 @@ namespace AndoBoss
         void ResetRound()
         {
             Fx.ClearAll();
-            foreach (var o in GameObject.FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
-            Player.ResetState();
+            foreach (var o in FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
+            PartyHp = Player.MaxHp; PartyStam = 100; StamDelay = 0; SlowT = 0;
+            foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
+            active = 0;
+            Party[0].gameObject.SetActive(true);
+            swapCd = 0;
             Boss.ResetState();
             TimeLeft = TimeLimit;
-            Dealt = Combo = MaxCombo = Perfects = 0;
+            Dealt = Combo = MaxCombo = Perfects = Reactions = 0;
             comboT = 0;
             energyAnnounced = false;
             Cinematic = false;
@@ -107,7 +128,7 @@ namespace AndoBoss
             Sfx.Play("confirm", 0.8f);
             Sfx.Play("roar", 0.6f, 1.2f);
             Music.Mix(0, 0.9f, 0.9f, 0, 0.6f);
-            Say("……私から単位を取るつもりですか？", 2.8f);
+            Say("……おめ、おれがら単位取るつもりだが？", 2.8f);
             LockCursor();
         }
 
@@ -119,7 +140,7 @@ namespace AndoBoss
             Hud.EndIntro();
             Hud.Banner("単位争奪戦", "START!", Color.white, 1.2f);
             Sfx.Play("burstHit", 0.6f);
-            PostFX.I?.Flash(Color.white, 0.5f);
+            PostFX.I?.Flash(Color.white, 0.4f);
             Cam.Shake(0.3f);
             Music.Restart();
             Music.SetBattle(false);
@@ -140,11 +161,26 @@ namespace AndoBoss
             Sky.Update(Time.unscaledDeltaTime);
             World.Update(dt, Boss.Phase == 2 ? 1 : 0);
 
+            realism = Mathf.MoveTowards(realism, Style, Time.unscaledDeltaTime * 3);
+            Shader.SetGlobalFloat("_AndoRealism", realism);
+
             if (GameInput.Down(GameInput.K.Mute))
             {
                 Music.Muted = !Music.Muted;
                 Sfx.Volume = Music.Muted ? 0 : 0.9f;
                 Hud.Toast(Music.Muted ? "音：オフ" : "音：オン");
+            }
+            if (GameInput.Down(GameInput.K.Light))
+            {
+                PostFX.Level = (PostFX.Level + 1) % 3;
+                PlayerPrefs.SetInt("ando_light", PostFX.Level);
+                Hud.Toast(PostFX.LevelNames[PostFX.Level]);
+            }
+            if (GameInput.Down(GameInput.K.Style))
+            {
+                Style = 1 - Style;
+                PlayerPrefs.SetInt("ando_style", Style);
+                Hud.Toast(Style == 1 ? "画風：リアル調" : "画風：アニメ調");
             }
 
             if (State == Mode.Battle && GameInput.Down(GameInput.K.Pause) && !paused) { SetPause(true); return; }
@@ -165,10 +201,7 @@ namespace AndoBoss
             }
         }
 
-        void LateUpdate()
-        {
-            Cam.Tick();
-        }
+        void LateUpdate() => Cam.Tick();
 
         void SetPause(bool on)
         {
@@ -179,12 +212,23 @@ namespace AndoBoss
             if (on) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
         }
 
+        void TickParty(float dt)
+        {
+            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(100, PartyStam + dt * 32);
+            SlowT = Mathf.Max(0, SlowT - dt);
+            for (int i = 0; i < Party.Length; i++)
+            {
+                if (i == active) Party[i].Tick(dt);
+                else Party[i].TickOffField(dt);
+            }
+        }
+
         void UpdateTitle()
         {
             titleOrbit += Time.unscaledDeltaTime * 0.12f;
             var c = new Vector3(Mathf.Sin(titleOrbit) * 15, 5 + Mathf.Sin(titleOrbit * 0.7f) * 1.5f, Mathf.Cos(titleOrbit) * 15);
             Cam.Cinematic(c, Boss.Pos + Vector3.up * 3.2f + new Vector3(Mathf.Cos(titleOrbit), 0, -Mathf.Sin(titleOrbit)) * 4, 50, stateT < 0.1f);
-            Player.Tick(Time.deltaTime);
+            TickParty(Time.deltaTime);
             Boss.Tick(Time.deltaTime);
             if (stateT > 0.5f && GameInput.Down(GameInput.K.Confirm)) GoIntro();
         }
@@ -195,7 +239,6 @@ namespace AndoBoss
             var B = Boss; var P = Player;
             if (t < 1.8f)
             {
-                // ボスの顔にぐっと寄る
                 float u = t / 1.8f;
                 var from = B.Pos + new Vector3(2.5f, 1.2f, -5.5f);
                 var to = B.Pos + new Vector3(1.2f, 3.8f, -4.2f);
@@ -207,7 +250,7 @@ namespace AndoBoss
                 var behind = P.Pos + new Vector3(0, 2.6f, -6);
                 Cam.Cinematic(behind, (P.Pos + B.Pos) * 0.5f + Vector3.up * 2f, 55);
             }
-            Player.Tick(Time.deltaTime);
+            TickParty(Time.deltaTime);
             Boss.Tick(Time.deltaTime);
             if (t > 3.3f || (t > 0.8f && GameInput.Down(GameInput.K.Confirm))) GoBattle();
         }
@@ -216,27 +259,50 @@ namespace AndoBoss
         {
             if (Cursor.lockState != CursorLockMode.Locked && GameInput.Down(GameInput.K.Attack)) LockCursor();
             TimeLeft -= dt;
-            Player.Tick(dt);
+            swapCd -= dt;
+            for (int i = 0; i < Party.Length; i++)
+                if (GameInput.Down(GameInput.K.Char1 + i)) SwapTo(i);
+            TickParty(dt);
             Boss.Tick(dt);
 
             comboT -= dt;
             if (comboT <= 0 && Combo > 0) Combo = 0;
 
-            if (PostFX.I) PostFX.I.LowHp = Player.Hp < Player.MaxHp * 0.3f ? 1 - Player.Hp / (Player.MaxHp * 0.3f) * 0.6f : 0;
+            if (PostFX.I) PostFX.I.LowHp = PartyHp < Player.MaxHp * 0.3f ? 1 - PartyHp / (Player.MaxHp * 0.3f) * 0.6f : 0;
             if (Player.Energy >= 100 && !energyAnnounced)
             {
                 energyAnnounced = true;
-                Sfx.Play("ready", 0.8f);
-                Hud.Toast("元素爆発 準備完了！　Q で発動");
+                Sfx.Play("ready", 0.7f);
+                Hud.Toast($"{Player.Def.Name}の元素爆発 準備完了！　Q で発動");
             }
             if (Player.Energy < 100) energyAnnounced = false;
 
             if (TimeLeft <= 0 && State == Mode.Battle) Lose("時間切れ…");
         }
 
+        // キャラ交代（原神と同じく 1・2・3 キー）
+        void SwapTo(int i)
+        {
+            if (i == active || swapCd > 0 || Player.BurstT > 0 || Player.Dead) return;
+            var from = Player;
+            var to = Party[i];
+            swapCd = 1.0f;
+            from.gameObject.SetActive(false);
+            active = i;
+            to.gameObject.SetActive(true);
+            to.EnterField(from.Pos, from.Face);
+            energyAnnounced = to.Energy >= 100;
+            var ec = to.Def.ElemColor;
+            Sfx.Play("swap", 0.9f);
+            Fx.Ring(to.Pos, 3.5f, ec, 0.35f);
+            Fx.Sparks(to.Pos + Vector3.up, ec, 20, 1f);
+            Fx.Glow(to.Pos + Vector3.up, ec, 1.2f);
+            Hud.OnSwap(to.Def);
+        }
+
         void UpdateEnding(float dt)
         {
-            Player.Tick(dt);
+            TickParty(dt);
             Boss.Tick(dt);
             if (win)
             {
@@ -269,38 +335,61 @@ namespace AndoBoss
         }
 
         // ================= 戦闘のできごと =================
-        public void Say(string text, float sec = 2.6f) => Hud.Say(text, sec);
+        public void Say(string text, float sec = 2.6f, string speaker = "安東先生") => Hud.Say(text, sec, speaker);
 
-        public void DamageBoss(float baseDmg, HitKind kind, Vector3 hitPos)
+        // light = 多段ヒットの細かい1発（ヒットストップと効果音を軽くする）
+        public void DamageBoss(float baseDmg, HitKind kind, Vector3 hitPos, Elem elem = Elem.None, bool light = false)
         {
             var B = Boss; var P = Player;
             if (State != Mode.Battle || !B.Alive) return;
             float critRate = P.BuffT > 0 ? 0.7f : 0.22f;
             bool crit = Random.value < critRate;
-            float mul = (crit ? 1.8f : 1f) * (B.Broken ? 1.5f : 1f) * Random.Range(0.9f, 1.1f);
+            float mul = (crit ? 1.8f : 1f) * (B.Broken ? 1.5f : 1f) * (B.FreezeT > 0 ? 1.2f : 1f) * Random.Range(0.9f, 1.1f);
+
+            // 元素反応
+            var react = Elements.React(B.Aura, elem);
+            if (react.name != null)
+            {
+                mul *= react.mul;
+                B.Aura = Elem.None; B.AuraT = 0;
+                Reactions++;
+                Hud.WorldText(hitPos + Vector3.up * 1.2f, react.name, react.color, 1.1f);
+                Sfx.Play(react.name == "過負荷" ? "explode" : react.name == "超電導" ? "ice" : "fire", 0.9f);
+                if (react.name == "過負荷") { Fx.Explosion(hitPos, react.color, 1.5f); Cam.Shake(0.4f); }
+                else if (react.name == "超電導") { Fx.Ring(B.Pos, 6, react.color, 0.4f, 3f); Fx.Sparks(hitPos, react.color, 30, 1.4f); }
+                else { Fx.Glow(hitPos, react.color, 2f); Fx.Embers(hitPos, react.color, 20); }
+                PostFX.I?.Chroma(0.15f);
+            }
+            else if (elem != Elem.None) { B.Aura = elem; B.AuraT = 7f; }
+
             int dmg = Mathf.Max(1, Mathf.RoundToInt(baseDmg * mul));
+            if (react.name != null && react.extra > 0) dmg += Mathf.RoundToInt(baseDmg * react.extra * (1 + Random.value * 0.2f));
             dmg = Mathf.Min(dmg, Mathf.CeilToInt(B.Hp));
             B.Hp -= dmg;
             Dealt += dmg;
-            float tough = dmg * (kind == HitKind.Skill ? 1.6f : kind == HitKind.Burst ? 1.0f : 0.9f);
+            float tough = dmg * (kind == HitKind.Skill ? 1.4f : kind == HitKind.Burst ? 0.8f : 0.9f) * (react.name != null ? react.tough : 1);
             B.OnDamaged(dmg, tough);
 
+            var ec = elem != Elem.None ? Elements.Color(elem) : P.Def.ElemColor;
             var numKind = kind == HitKind.Burst ? Hud.NumKind.Burst : crit ? Hud.NumKind.Crit : B.Broken ? Hud.NumKind.Break : Hud.NumKind.Normal;
-            Hud.Number(hitPos + Vector3.up * 0.5f, dmg, numKind);
+            Hud.Number(hitPos + Vector3.up * 0.5f, dmg, numKind, react.name != null ? react.color : ec);
             Hud.BossBarShake();
-            Fx.Sparks(hitPos, crit ? Mat.Gold : Mat.ElectroLight, crit ? 22 : 12, crit ? 1.4f : 1f);
-            Fx.Glow(hitPos, crit ? Mat.Gold : Mat.Electro, crit ? 1.3f : 0.8f);
-            if (crit) { Fx.AirRing(hitPos, 2.2f, Mat.Gold, 0.25f); Fx.Stars(hitPos, Mat.Gold, 4); }
-            Sfx.Play(crit ? "crit" : "hit", crit ? 0.9f : 0.75f, crit ? 1f : Random.Range(0.95f, 1.1f));
-            Sfx.Play("zap", 0.25f, 1.4f);
-            Fx.HitStop(kind == HitKind.Burst ? 0.05f : crit ? 0.075f : 0.04f);
-            Cam.Shake(crit ? 0.22f : 0.1f);
-            if (crit) PostFX.I?.Chroma(0.12f);
+            if (!light)
+            {
+                Fx.Sparks(hitPos, crit ? Mat.Gold : Color.Lerp(ec, Color.white, 0.4f), crit ? 22 : 12, crit ? 1.4f : 1f);
+                Fx.Glow(hitPos, crit ? Mat.Gold : ec, crit ? 1.1f : 0.7f);
+                if (crit) { Fx.AirRing(hitPos, 2.2f, Mat.Gold, 0.25f); Fx.Stars(hitPos, Mat.Gold, 4); }
+                Sfx.Play(crit ? "crit" : "hit", crit ? 0.9f : 0.75f, crit ? 1f : Random.Range(0.92f, 1.08f));
+                if (P.Def.Elem == Elem.Electro) Sfx.Play("zap", 0.2f);
+                Fx.HitStop(kind == HitKind.Burst ? 0.05f : crit ? 0.075f : 0.04f);
+                Cam.Shake(crit ? 0.22f : 0.1f);
+                if (crit) PostFX.I?.Chroma(0.12f);
+            }
+            else Fx.HitStop(0.012f);
 
             Combo++; comboT = 2.6f;
             MaxCombo = Mathf.Max(MaxCombo, Combo);
             Hud.Combo(Combo);
-            if (Combo % 10 == 0) Sfx.Play("tick", 0.6f, 1 + Mathf.Min(Combo, 60) / 60f);
 
             if (kind == HitKind.Normal)
             {
@@ -312,16 +401,29 @@ namespace AndoBoss
 
         public void OnPlayerHurt(float amount)
         {
-            Hud.Number(Player.Pos + Vector3.up * 2.2f, Mathf.RoundToInt(amount), Hud.NumKind.Player);
+            Hud.Number(Player.Pos + Vector3.up * 2.2f, Mathf.RoundToInt(amount), Hud.NumKind.Player, Color.red);
             Hud.Hurt(0.8f);
             Cam.Shake(0.4f);
             Sfx.Play("hurt", 0.9f);
-            PostFX.I?.Chroma(0.35f);
-            PostFX.I?.Flash(new Color(1, 0.2f, 0.2f), 0.18f);
+            PostFX.I?.Chroma(0.3f);
+            PostFX.I?.Flash(new Color(1, 0.2f, 0.2f), 0.15f);
             Fx.HitStop(0.06f);
             Fx.Sparks(Player.Pos + Vector3.up, new Color(1, 0.4f, 0.4f), 12);
             if (Combo >= 5) Hud.Toast($"{Combo} コンボ終了");
             Combo = 0;
+            Boss.OnHitPlayer();
+        }
+
+        public void ApplySlow(float sec)
+        {
+            bool was = SlowT > 0;
+            SlowT = Mathf.Max(SlowT, sec);
+            if (!was)
+            {
+                Sfx.Play("slowdown", 0.8f);
+                Hud.Toast("鈍足！ 移動速度が下がった");
+                Fx.Ring(Player.Pos, 2.5f, new Color(0.4f, 1f, 0.6f), 0.4f);
+            }
         }
 
         public void PerfectDodge()
@@ -351,7 +453,7 @@ namespace AndoBoss
             Fx.Stars(Boss.HeadPos, Mat.Gold, 30);
             Fx.Sparks(Boss.Pos + Vector3.up * 2.5f, Mat.Gold, 40, 1.6f);
             Fx.Ring(Boss.Pos, 8, Mat.Gold, 0.5f, 3f);
-            Say("な……私の理論が……！", 2f);
+            Say("な……おれの理論が……！", 2f);
         }
 
         public void OnPhase2()
@@ -362,7 +464,7 @@ namespace AndoBoss
             Sfx.Play("roar", 1f);
             Sfx.Play("thunder", 0.8f);
             Cam.Shake(0.7f);
-            PostFX.I?.Flash(new Color(0.8f, 0.5f, 1f), 0.6f, 2f);
+            PostFX.I?.Flash(new Color(0.8f, 0.5f, 1f), 0.5f, 2f);
             PostFX.I?.Radial(0.5f);
             for (int i = 0; i < 6; i++)
             {
@@ -375,65 +477,46 @@ namespace AndoBoss
             }
         }
 
+        public void OnSansou()
+        {
+            Hud.Banner("必殺「三相交流」", "3本の波のすき間をぬってよけろ！", new Color(1f, 0.4f, 0.35f), 1.6f);
+            Cam.Shake(0.4f);
+            PostFX.I?.Radial(0.3f);
+        }
+
         // ---- 元素爆発 ----
-        public void StartBurst()
+        public void StartBurst(Player p)
         {
             Cinematic = true;
-            Hud.CutIn();
+            Hud.CutIn(p.Def);
+            Say(p.Def.BurstShout, 1.8f, p.Def.Name);
             Sfx.Play("cutin", 1f);
             Sfx.Play("charge", 0.8f);
             Music.Duck(true);
             Fx.Slow(0.35f, 1.0f);
             PostFX.I?.Radial(0.5f);
-            PostFX.I?.Bloom(0.8f);
-            var P = Player;
-            var fwd = new Vector3(Mathf.Sin(P.Face), 0, Mathf.Cos(P.Face));
+            var fwd = p.Forward;
             var right = new Vector3(fwd.z, 0, -fwd.x);
-            Cam.Cinematic(P.Pos + fwd * 3.2f + right * 1.1f + Vector3.up * 0.9f, P.Pos + Vector3.up * 1.9f, 38);
-            Fx.Ring(P.Pos, 5, Mat.Electro, 0.8f, 3f);
-            Fx.Sparks(P.Pos + Vector3.up, Mat.ElectroLight, 30, 1.2f);
+            Cam.Cinematic(p.Pos + fwd * 3.2f + right * 1.1f + Vector3.up * 0.9f, p.Pos + Vector3.up * 1.8f, 38);
+            Fx.Ring(p.Pos, 5, p.Def.ElemColor, 0.8f, 3f);
+            Fx.Sparks(p.Pos + Vector3.up, p.Def.ElemColor, 30, 1.2f);
         }
 
-        public void FireBurst()
+        public void FireBurst(Player p)
         {
             Cinematic = false;
             Cam.EndCinematic();
             Music.Duck(false);
             Hud.Letterbox(false);
-            Sfx.Play("burstHit", 0.7f);
-            PostFX.I?.Flash(Color.white, 0.6f);
-            Sky.Flash(1f);
-            for (int i = 0; i < 6; i++)
+            Sfx.Play("burstHit", 0.6f);
+            PostFX.I?.Flash(Color.white, 0.4f);
+            Sky.Flash(0.6f);
+            switch (p.Def.Id)
             {
-                Fx.Later(0.1f + i * 0.16f, () =>
-                {
-                    if (!Boss.Alive || State != Mode.Battle) return;
-                    var p = Boss.Pos + new Vector3(Random.Range(-1f, 1f), 0, Random.Range(-1f, 1f));
-                    Fx.Bolt(p, Mat.Electro, 0.55f);
-                    Fx.Ring(Boss.Pos, 4.5f, Mat.Electro, 0.3f);
-                    Cam.Shake(0.3f);
-                    Sfx.Play("thunder", 0.7f, 1.1f);
-                    PostFX.I?.Chroma(0.15f);
-                    DamageBoss(120, HitKind.Burst, Boss.Pos + Vector3.up * 3f);
-                });
+                case 0: Skills.TomokiBurst(p); break;
+                case 1: Skills.SugiyamaBurst(p); break;
+                default: Skills.YamashouBurst(p); break;
             }
-            // とどめの一撃
-            Fx.Later(1.25f, () =>
-            {
-                if (!Boss.Alive || State != Mode.Battle) return;
-                for (int k = 0; k < 4; k++) Fx.Bolt(Boss.Pos + Random.insideUnitSphere * 1.5f, k % 2 == 0 ? Color.white : Mat.Electro, 0.9f, 34);
-                Fx.Ring(Boss.Pos, 11, Mat.Electro, 0.6f, 3f);
-                Fx.Ring(Boss.Pos, 7, Color.white, 0.4f, 3f);
-                Fx.Sparks(Boss.Pos + Vector3.up * 2, Mat.ElectroLight, 60, 2f);
-                Fx.Glow(Boss.Pos + Vector3.up * 2, Color.white, 4f);
-                Sfx.Play("burstHit", 1f, 0.85f);
-                PostFX.I?.Flash(Color.white, 0.7f);
-                PostFX.I?.Radial(0.8f);
-                Cam.Shake(0.8f);
-                Cam.FovPunch(8);
-                Fx.HitStop(0.12f);
-                DamageBoss(320, HitKind.Burst, Boss.Pos + Vector3.up * 3.6f);
-            });
         }
 
         // ---- 元素エネルギーの玉 ----
@@ -443,18 +526,17 @@ namespace AndoBoss
             {
                 var go = new GameObject("orb");
                 go.transform.position = from;
-                var o = go.AddComponent<Orb>();
-                o.Init(Random.onUnitSphere * Random.Range(5f, 9f) + Vector3.up * 5);
+                go.AddComponent<Orb>().Init(Random.onUnitSphere * Random.Range(5f, 9f) + Vector3.up * 5, Player.Def.ElemColor);
             }
         }
 
         public void CollectOrb()
         {
-            bool wasReady = Player.Energy >= 100;
-            Player.Energy = Mathf.Min(100, Player.Energy + 6);
-            Sfx.Play("orb", 0.6f, 1 + Player.Energy / 200f);
-            Fx.Sparks(Player.Pos + Vector3.up, Mat.ElectroLight, 6, 0.5f);
-            _ = wasReady;
+            // 出ているキャラは多め、控えのキャラも少したまる
+            for (int i = 0; i < Party.Length; i++)
+                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 6 : 3));
+            Sfx.Play("orb", 0.5f, 0.9f + Player.Energy / 300f);
+            Fx.Sparks(Player.Pos + Vector3.up, Player.Def.ElemColor, 6, 0.5f);
         }
 
         // ================= 決着 =================
@@ -466,12 +548,12 @@ namespace AndoBoss
             Player.Victory = true;
             Cinematic = true;
             Hud.Letterbox(true);
-            Say("……いいでしょう。単位を認めます。", 4.5f);
-            int bonus = 1000 + Mathf.CeilToInt(TimeLeft) * 20 + Mathf.RoundToInt(Player.Hp);
+            Say("……しかたねな。単位、認めるべ。", 4.5f);
+            int bonus = 1000 + Mathf.CeilToInt(TimeLeft) * 20 + Mathf.RoundToInt(PartyHp);
             Hud.Banner("撃破！", $"撃破ボーナス +{bonus}", Mat.Gold, 2.6f);
             Fx.Slow(0.15f, 1.4f);
             Fx.HitStop(0.2f);
-            PostFX.I?.Flash(Color.white, 1f, 1.5f);
+            PostFX.I?.Flash(Color.white, 0.8f, 1.5f);
             PostFX.I?.Radial(1f);
             Cam.Shake(1f);
             Music.StopAll();
@@ -500,12 +582,11 @@ namespace AndoBoss
             State = Mode.Ending; stateT = 0; win = false; loseReason = reason;
             Cinematic = true;
             Hud.Letterbox(true);
-            Say(reason == "時間切れ…" ? "時間です。答案を回収します。" : "来年また会いましょう。", 3.5f);
+            Say(reason == "時間切れ…" ? "時間だ。答案、回収するど。" : "へば、また来年な。", 3.5f);
             Hud.Banner(reason, "", new Color(0.75f, 0.8f, 1f), 2.2f);
             Fx.Slow(0.3f, 1.2f);
             PostFX.I?.Desaturate(0.75f);
             Music.StopAll();
-            if (reason == "時間切れ…") Player.Victory = false;
         }
 
         public void OnPlayerDown() => Lose("力尽きた…");
@@ -522,14 +603,15 @@ namespace AndoBoss
                 dealt = Dealt,
                 killBonus = win ? 1000 : 0,
                 timeBonus = win ? Mathf.CeilToInt(Mathf.Max(0, TimeLeft)) * 20 : 0,
-                hpBonus = win ? Mathf.RoundToInt(Player.Hp) : 0,
+                hpBonus = win ? Mathf.RoundToInt(PartyHp) : 0,
                 perfects = Perfects,
                 perfectBonus = Perfects * 100,
                 maxCombo = MaxCombo,
                 comboBonus = MaxCombo * 5,
+                reactions = Reactions,
             };
-            d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus;
-            d.grade = !win ? "不可" : d.total >= 7000 ? "秀" : d.total >= 6200 ? "優" : d.total >= 5400 ? "良" : "可";
+            d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus + d.reactions * 20;
+            d.grade = !win ? "不可" : d.total >= 13000 ? "秀" : d.total >= 12000 ? "優" : d.total >= 11000 ? "良" : "可";
             int best = PlayerPrefs.GetInt(BestKey, 0);
             d.record = d.total > best;
             if (d.record) { PlayerPrefs.SetInt(BestKey, d.total); PlayerPrefs.Save(); }
@@ -549,16 +631,16 @@ namespace AndoBoss
     public class Orb : MonoBehaviour
     {
         Vector3 vel; float t;
-        public void Init(Vector3 v)
+        public void Init(Vector3 v, Color c)
         {
             vel = v;
-            var q = Mat.Part(transform, Mat.Quad, Mat.FxShared(new Color(0.8f, 0.6f, 1f, 1f), Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 0.7f, default, false);
+            var q = Mat.Part(transform, Mat.Quad, Mat.FxShared(new Color(c.r, c.g, c.b, 1f), Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 0.7f, default, false);
             q.AddComponent<Billboard>();
             var tr = gameObject.AddComponent<TrailRenderer>();
             tr.time = 0.25f; tr.widthMultiplier = 0.25f;
             tr.widthCurve = new AnimationCurve(new Keyframe(0, 1), new Keyframe(1, 0));
             var g = new Gradient();
-            g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(Mat.Electro, 1) }, new[] { new GradientAlphaKey(1, 0), new GradientAlphaKey(0, 1) });
+            g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(c, 1) }, new[] { new GradientAlphaKey(1, 0), new GradientAlphaKey(0, 1) });
             tr.colorGradient = g;
             tr.sharedMaterial = Mat.FxShared(Color.white, Mat.White, true, 2f);
         }
