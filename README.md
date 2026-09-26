@@ -37,6 +37,10 @@
 - 3D表示には three.js（`vendor/three.min.js`、MIT ライセンス）を使っている。ネット接続は不要
 - 3Dなので、古いPCだと動きが重くなることがある。当日使うPCで事前に一度遊んでおくこと
 
+## Unity 版ボス戦
+
+`unity/AndoBossBattle` に、ボス戦を Unity 6 で原神風に作り直したものがあります。曲・効果音・3Dモデルはすべてプログラムで生成しています。開き方と操作は [unity/AndoBossBattle/README.md](unity/AndoBossBattle/README.md) を参照。
+
 ## 文化祭での置き方
 
 1. PC で `index.html` を開く
