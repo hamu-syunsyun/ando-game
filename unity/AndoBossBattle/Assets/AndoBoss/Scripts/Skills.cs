@@ -302,7 +302,8 @@ namespace AndoBoss
             {
                 if (!B.Alive || G.State != Game.Mode.Battle) { p.LockT = 0; return false; }
                 t += dt;
-                int cur = Mathf.FloorToInt(t / passDur);
+                // 最後の突進（pass == passes）より先には進まないようにする
+                int cur = Mathf.Min(Mathf.FloorToInt(t / passDur), passes);
                 if (cur != pass)
                 {
                     pass = cur;
@@ -346,6 +347,8 @@ namespace AndoBoss
                     G.Hud.WorldText(B.Pos + Vector3.up * 5f, pass == 0 ? "ぶつかる！" : pass == 1 ? "もう一丁！" : "まだまだぁ！", ec, 1f);
                     G.DamageBoss(150, Game.HitKind.Burst, B.Pos + Vector3.up * 2.2f, pass == 0 ? Elem.Pyro : Elem.None);
                 }
+                // 念のため：何かあっても2.5秒で必ず終わらせて、動けるようにする
+                if (t > 2.5f) { p.LockT = 0; return false; }
                 if (pass >= passes && u >= 1)
                 {
                     p.LockT = 0;
