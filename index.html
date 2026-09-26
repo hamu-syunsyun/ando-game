@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>安東先生の電気回路</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main id="app">
+
+  <!-- タイトル -->
+  <section id="screen-title" class="screen is-active" aria-label="タイトル">
+    <div class="title-top">
+      <div class="title-logo">
+        <p class="kicker">電気回路　前期末</p>
+        <h1>安東先生から<br><em>単位</em>をもぎとれ！</h1>
+      </div>
+      <div class="title-ando">
+        <p class="bubble" id="title-bubble"></p>
+        <div class="ando-face" data-ando></div>
+      </div>
+    </div>
+    <div class="title-main">
+      <div class="mode-list" id="mode-list"></div>
+      <aside class="rank-panel">
+        <h2>ランキング</h2>
+        <div class="rank-tabs" id="rank-tabs"></div>
+        <ol class="rank-list" id="rank-list"></ol>
+      </aside>
+    </div>
+    <footer class="title-foot">
+      <span id="play-count"></span>
+      <span class="foot-keys">M キー：音のオン／オフ</span>
+      <button class="ghost-btn" id="btn-fullscreen" type="button">全画面</button>
+    </footer>
+  </section>
+
+  <!-- あそびかた -->
+  <section id="screen-howto" class="screen" aria-label="あそびかた">
+    <div class="howto-card">
+      <p class="kicker" id="howto-kicker"></p>
+      <h2 id="howto-title"></h2>
+      <ul class="howto-list" id="howto-list"></ul>
+      <div class="howto-actions">
+        <button class="big-btn" id="btn-start" type="button">はじめる</button>
+        <button class="ghost-btn" id="btn-howto-back" type="button">もどる</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ゲーム -->
+  <section id="screen-game" class="screen" aria-label="ゲーム">
+    <header class="hud">
+      <div class="hud-stage" id="hud-stage"></div>
+      <div class="hud-time">
+        <div class="time-bar"><div class="time-fill" id="time-fill"></div></div>
+        <span class="time-num" id="hud-time">0</span>
+      </div>
+      <div class="hud-score"><small>SCORE</small><span id="hud-score">0</span></div>
+      <div class="hud-combo" id="hud-combo"></div>
+      <button class="ghost-btn hud-quit" id="btn-quit" type="button">やめる</button>
+    </header>
+    <div class="stage" id="stage"></div>
+    <div class="overlay" id="overlay"><div class="overlay-text" id="overlay-text"></div></div>
+  </section>
+
+  <!-- 結果 -->
+  <section id="screen-result" class="screen" aria-label="結果">
+    <div class="result-wrap">
+      <div class="result-left">
+        <p class="kicker" id="result-mode"></p>
+        <div class="result-head">
+          <div class="stamp" id="result-stamp"></div>
+          <div>
+            <p class="result-verdict" id="result-verdict"></p>
+            <p class="result-score"><span id="result-score">0</span> 点</p>
+          </div>
+        </div>
+        <ul class="result-stats" id="result-stats"></ul>
+        <div class="result-ando">
+          <div class="ando-face small" data-ando></div>
+          <p class="bubble" id="result-bubble"></p>
+        </div>
+      </div>
+      <div class="result-right">
+        <form class="name-form" id="name-form" autocomplete="off">
+          <p class="name-rank" id="name-rank"></p>
+          <label for="name-input">名前を入れて「登録」</label>
+          <div class="name-row">
+            <input id="name-input" maxlength="10" spellcheck="false" placeholder="ななし">
+            <button class="big-btn" type="submit">登録</button>
+          </div>
+        </form>
+        <h2>ランキング</h2>
+        <ol class="rank-list" id="result-rank"></ol>
+        <div class="result-actions">
+          <button class="big-btn" id="btn-retry" type="button">もう一度</button>
+          <button class="ghost-btn" id="btn-to-title" type="button">タイトルへ</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="fx" aria-hidden="true"></div>
+  <div id="mute-badge" hidden>音：オフ</div>
+</main>
+
+<script src="js/util.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/ranking.js"></script>
+<script src="js/choice.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/colorcode.js"></script>
+<script src="js/wiring.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
