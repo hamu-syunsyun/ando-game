@@ -87,43 +87,79 @@ namespace AndoBoss
             });
         }
 
-        // 杉山くん「炎のロングパス」：炎をまとったラグビーボールを投げる。着弾で爆発
+        // 杉山くん「炎のロングパス」：燃えさかるラグビーボールを全力で投げる。
+        // 着弾で大爆発＋火柱の輪。当たるとボスの防御力が8秒間下がる
         public static void RugbyPass(Player p)
         {
             var ec = p.Def.ElemColor;
-            Sfx.Play("whoosh", 0.9f, 0.7f);
+            Sfx.Play("whoosh", 1f, 0.6f);
+            Sfx.Play("fire", 0.8f, 0.8f);
+            G.Cam.FovPunch(-5);
+            G.Cam.Shake(0.2f);
+            Fx.Explosion(p.HandPos, ec, 0.8f);
             var ball = new GameObject("rugby");
-            Mat.Part(ball.transform, Mat.Sphere, Mat.ToonShared(new Color(0.55f, 0.3f, 0.15f), 0.02f), Vector3.zero, new Vector3(0.45f, 0.45f, 0.75f));
-            Mat.Part(ball.transform, Mat.Cube, Mat.ToonShared(Color.white), new Vector3(0, 0.22f, 0), new Vector3(0.05f, 0.03f, 0.4f), default, false);
-            var glow = Mat.Part(ball.transform, Mat.Quad, Mat.FxShared(new Color(ec.r, ec.g, ec.b, 0.9f), Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 1.8f, default, false);
+            Mat.Part(ball.transform, Mat.Sphere, Mat.ToonShared(new Color(0.55f, 0.3f, 0.15f), 0.02f), Vector3.zero, new Vector3(0.55f, 0.55f, 0.9f));
+            Mat.Part(ball.transform, Mat.Cube, Mat.ToonShared(Color.white), new Vector3(0, 0.27f, 0), new Vector3(0.06f, 0.03f, 0.5f), default, false);
+            var glow = Mat.Part(ball.transform, Mat.Quad, Mat.FxShared(new Color(ec.r, ec.g, ec.b, 1f), Mat.Glow, true, 3.5f), Vector3.zero, Vector3.one * 3.2f, default, false);
             glow.AddComponent<Billboard>();
+            var tr = ball.AddComponent<TrailRenderer>();
+            tr.time = 0.35f; tr.widthMultiplier = 1.4f;
+            tr.widthCurve = new AnimationCurve(new Keyframe(0, 1), new Keyframe(1, 0));
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(ec, 0.3f), new GradientColorKey(new Color(0.6f, 0.1f, 0f), 1) }, new[] { new GradientAlphaKey(1, 0), new GradientAlphaKey(0, 1) });
+            tr.colorGradient = g;
+            tr.sharedMaterial = Mat.FxShared(Color.white, Mat.White, true, 2.5f);
             var start = p.HandPos + Vector3.up * 0.5f;
-            var target = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 18 ? B.Pos + Vector3.up * 2f : p.Pos + p.Forward * 10;
-            float t = 0; const float dur = 0.55f;
+            var target = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 20 ? B.Pos + Vector3.up * 2f : p.Pos + p.Forward * 12;
+            float t = 0; const float dur = 0.6f;
             Fx.Run(dt =>
             {
                 t += dt;
                 float u = Mathf.Clamp01(t / dur);
                 var tgt = B.Alive ? Vector3.Lerp(target, B.Pos + Vector3.up * 2f, u) : target;
-                ball.transform.position = Vector3.Lerp(start, tgt, u) + Vector3.up * Mathf.Sin(u * Mathf.PI) * 3f;
-                ball.transform.rotation = Quaternion.LookRotation((tgt - start).normalized) * Quaternion.Euler(0, 0, t * 900);
-                Fx.Embers(ball.transform.position, ec, 2);
-                if (u >= 1)
+                ball.transform.position = Vector3.Lerp(start, tgt, u) + Vector3.up * Mathf.Sin(u * Mathf.PI) * 4f;
+                ball.transform.rotation = Quaternion.LookRotation((tgt - start).normalized) * Quaternion.Euler(0, 0, t * 1200);
+                Fx.Embers(ball.transform.position, ec, 5);
+                if (Random.value < 0.5f) Fx.Sparks(ball.transform.position, ec, 2, 0.5f);
+                if (u < 1) return true;
+
+                // ---- 着弾：ド派手に ----
+                var hp = ball.transform.position;
+                var ground = Player.Flat(hp);
+                Fx.Explosion(hp, ec, 3f);
+                Fx.Explosion(hp + Vector3.up, Color.white, 1.2f);
+                Fx.Pillar(ground, ec, 3.5f, 14f, 1.0f);
+                for (int i = 0; i < 6; i++)
                 {
-                    var hp = ball.transform.position;
-                    Fx.Explosion(hp, ec, 1.6f);
-                    Fx.Pillar(Player.Flat(hp), ec, 2.5f, 6f, 0.7f);
-                    Sfx.Play("explode", 0.9f);
-                    G.Cam.Shake(0.3f);
-                    G.Hud.WorldText(hp + Vector3.up * 2.5f, "トライ！", ec, 1f);
-                    if (B.Alive && Player.Flat(B.Pos - hp).magnitude < 4f + Boss.Radius)
+                    int k = i;
+                    Fx.Later(0.08f * k, () =>
                     {
-                        G.DamageBoss(210, Game.HitKind.Skill, B.Pos + Vector3.up * 2.4f, Elem.Pyro);
-                        G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 2);
-                    }
-                    return false;
+                        float a = k / 6f * Mathf.PI * 2;
+                        var pp = ground + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 4.5f;
+                        Fx.Pillar(pp, ec, 1.4f, 7f, 0.8f);
+                        Fx.Explosion(pp + Vector3.up * 0.5f, ec, 0.7f);
+                        Sfx.Play("fire", 0.5f, 1.1f + k * 0.05f);
+                    });
                 }
-                return true;
+                Fx.Ring(ground, 9f, ec, 0.5f, 3f);
+                Fx.Ring(ground, 6f, Color.white, 0.3f, 3f);
+                Fx.Scorch(ground, 4f);
+                Sfx.Play("explode", 1f, 0.9f);
+                Sfx.Play("boom", 0.8f, 0.8f);
+                G.Cam.Shake(0.7f);
+                PostFX.I?.Flash(new Color(1f, 0.6f, 0.3f), 0.5f);
+                PostFX.I?.Radial(0.5f);
+                Sky.Flash(0.5f);
+                Fx.HitStop(0.08f);
+                G.Hud.WorldText(hp + Vector3.up * 3f, "トライ！！", ec, 1.5f);
+                if (B.Alive && Player.Flat(B.Pos - hp).magnitude < 4.5f + Boss.Radius)
+                {
+                    G.DamageBoss(230, Game.HitKind.Skill, B.Pos + Vector3.up * 2.4f, Elem.Pyro);
+                    B.DefDownT = 8f;
+                    Fx.Later(0.25f, () => G.Hud.WorldText(B.Pos + Vector3.up * 5f, "防御ダウン！", new Color(1f, 0.6f, 0.3f), 1.1f));
+                    G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 2);
+                }
+                return false;
             }, ball);
         }
 
@@ -292,25 +328,51 @@ namespace AndoBoss
                 p.Pos = new Vector3(pos.x, 0, pos.z);
                 var dir = Player.Flat(to - from);
                 if (dir.sqrMagnitude > 0.01f) p.Face = Mathf.Atan2(dir.x, dir.z);
-                Fx.Embers(p.Pos + Vector3.up * Random.Range(0.3f, 1.6f), ec, 3);
-                if (Random.value < 0.5f) Fx.Debris(p.Pos, new Color(0.8f, 0.75f, 0.64f), 1);
+                Fx.Embers(p.Pos + Vector3.up * Random.Range(0.3f, 1.6f), ec, 6);
+                Fx.Sparks(p.Pos + Vector3.up, ec, 2, 0.6f);
+                if (Random.value < 0.25f) Fx.Scorch(p.Pos, 1.2f);
+                if (Random.value < 0.5f) Fx.Debris(p.Pos, new Color(0.8f, 0.75f, 0.64f), 2);
                 if (pass < passes && !hitThis && u > 0.5f)
                 {
                     hitThis = true;
-                    Fx.Explosion(B.Pos + Vector3.up * 2, ec, 1f);
-                    Sfx.Play("stomp", 0.9f, 1.1f);
-                    G.Cam.Shake(0.35f);
+                    Fx.Explosion(B.Pos + Vector3.up * 2, ec, 1.8f);
+                    Fx.Pillar(Player.Flat(B.Pos), ec, 2.5f, 9f, 0.5f);
+                    Fx.Ring(B.Pos, 6f, ec, 0.3f, 3f);
+                    Sfx.Play("stomp", 1f, 1.1f);
+                    Sfx.Play("explode", 0.6f, 1.2f);
+                    G.Cam.Shake(0.5f);
+                    PostFX.I?.Flash(new Color(1f, 0.6f, 0.3f), 0.25f);
+                    Fx.HitStop(0.06f);
+                    G.Hud.WorldText(B.Pos + Vector3.up * 5f, pass == 0 ? "ぶつかる！" : pass == 1 ? "もう一丁！" : "まだまだぁ！", ec, 1f);
                     G.DamageBoss(150, Game.HitKind.Burst, B.Pos + Vector3.up * 2.2f, pass == 0 ? Elem.Pyro : Elem.None);
                 }
                 if (pass >= passes && u >= 1)
                 {
                     p.LockT = 0;
-                    Fx.Pillar(Player.Flat(B.Pos), ec, 5f, 14f, 1.2f);
-                    Fx.Explosion(B.Pos + Vector3.up * 2, ec, 2.5f);
-                    Fx.Ring(B.Pos, 12, ec, 0.6f, 3f);
-                    G.Hud.WorldText(B.Pos + Vector3.up * 6f, "タックル！！", ec, 1.4f);
-                    Sfx.Play("explode", 1f, 0.8f);
-                    Finale(400, Elem.Pyro);
+                    // 最後の全力タックル：火柱の輪・大爆発・スロー
+                    Fx.Pillar(Player.Flat(B.Pos), ec, 6f, 22f, 1.4f);
+                    Fx.Explosion(B.Pos + Vector3.up * 2, ec, 4f);
+                    Fx.Explosion(B.Pos + Vector3.up * 3, Color.white, 1.5f);
+                    for (int i = 0; i < 10; i++)
+                    {
+                        int k = i;
+                        Fx.Later(0.05f * k, () =>
+                        {
+                            float a = k / 10f * Mathf.PI * 2;
+                            var pp = Player.Flat(B.Pos) + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 7f;
+                            Fx.Pillar(pp, ec, 1.8f, 10f, 1f);
+                            Fx.Explosion(pp + Vector3.up, ec, 0.8f);
+                        });
+                    }
+                    Fx.Ring(B.Pos, 16, ec, 0.8f, 3f);
+                    Fx.Ring(B.Pos, 10, Color.white, 0.5f, 3f);
+                    Fx.Debris(B.Pos + Vector3.up, new Color(0.35f, 0.3f, 0.3f), 60);
+                    Fx.Slow(0.2f, 0.9f);
+                    Sky.Flash(1f);
+                    G.Hud.WorldText(B.Pos + Vector3.up * 6.5f, "ラグビー部なめんな！！", ec, 1.5f);
+                    Sfx.Play("explode", 1f, 0.7f);
+                    Sfx.Play("boom", 1f, 0.6f);
+                    Finale(480, Elem.Pyro);
                     return false;
                 }
                 return true;

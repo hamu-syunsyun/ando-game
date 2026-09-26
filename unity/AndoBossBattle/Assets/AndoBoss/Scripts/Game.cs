@@ -24,7 +24,7 @@ namespace AndoBoss
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
         // パーティ共通のHP・スタミナ・デバフ
         public const float MaxStam = 150f;
-        public float PartyHp = Player.MaxHp, PartyStam = MaxStam, StamDelay, SlowT;
+        public float PartyHp = 1000f, PartyStam = MaxStam, StamDelay, SlowT;
         public int StartChar;
         public bool ReviveUsed;
         float drinkT;
@@ -104,6 +104,7 @@ namespace AndoBoss
             foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
             active = StartChar;
             Party[active].gameObject.SetActive(true);
+            PartyHp = Player.MaxHp;
             swapCd = 0;
             Boss.ResetState();
             TimeLeft = TimeLimit;
@@ -310,8 +311,7 @@ namespace AndoBoss
             if (Cursor.lockState != CursorLockMode.Locked && GameInput.Down(GameInput.K.Attack)) LockCursor();
             TimeLeft -= dt;
             swapCd -= dt;
-            for (int i = 0; i < Party.Length; i++)
-                if (GameInput.Down(GameInput.K.Char1 + i)) SwapTo(i);
+            // キャラ交代はなし（最初に選んだキャラで最後まで戦う）
             TickParty(dt);
             Boss.Tick(dt);
 
@@ -402,7 +402,7 @@ namespace AndoBoss
             if (State != Mode.Battle || !B.Alive) return;
             float critRate = P.BuffT > 0 ? 0.6f : 0.18f;
             bool crit = Random.value < critRate;
-            float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * Random.Range(0.9f, 1.1f);
+            float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * (B.DefDownT > 0 ? 1.3f : 1f) * Random.Range(0.9f, 1.1f);
 
             // 属性コンボ
             var react = Elements.React(B.Aura, elem);
@@ -650,7 +650,7 @@ namespace AndoBoss
         // やられたとき。やましょうのパッシブ「留年」が残っていれば1回だけ生き返る
         public void OnPlayerDown()
         {
-            if (!ReviveUsed) { Revive(); return; }
+            if (!ReviveUsed && Player.Def.Passive.StartsWith("留年")) { Revive(); return; }
             Lose("力尽きた…");
         }
 
@@ -705,6 +705,7 @@ namespace AndoBoss
                 maxCombo = MaxCombo,
                 comboBonus = MaxCombo * 5,
                 reactions = Reactions,
+                charName = Player.Def.Name,
             };
             d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus + d.reactions * 20;
             d.grade = !win ? "不可" : d.total >= 19500 ? "秀" : d.total >= 18700 ? "優" : d.total >= 18000 ? "良" : "可";
@@ -780,7 +781,7 @@ namespace AndoBoss
             if (y <= 0.8f && Player.Flat(P.Pos - pos).magnitude < 1.4f && P.Pos.y < 1.5f && !P.Dead)
             {
                 float before = G.PartyHp;
-                G.PartyHp = Mathf.Min(Player.MaxHp, G.PartyHp + Heal);
+                G.PartyHp = Mathf.Min(G.Player.MaxHp, G.PartyHp + Heal);
                 int healed = Mathf.RoundToInt(G.PartyHp - before);
                 G.Hud.Number(P.Pos + Vector3.up * 2.2f, healed, Hud.NumKind.Heal, new Color(0.4f, 1f, 0.5f));
                 G.Hud.Toast("エナドリで回復！　元気100倍");

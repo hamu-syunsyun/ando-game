@@ -14,7 +14,7 @@ namespace AndoBoss
         public string Name, Title;
         public Elem Elem;
         public Weapon Weapon;
-        public float AtkMul = 1f, Height = 1f;
+        public float AtkMul = 1f, Height = 1f, MaxHp = 1000f;
         public float[] SwingDmg, SwingDur;
         public float SkillCd;
         public string SkillName, BurstName, BurstShout;
@@ -28,7 +28,7 @@ namespace AndoBoss
         {
             new CharDef
             {
-                Id = 0, Name = "ともき", Title = "雷の受講生", Elem = Elem.Electro, Weapon = Weapon.Sword,
+                Id = 0, Name = "ともき", Title = "雷の受講生", Elem = Elem.Electro, Weapon = Weapon.Sword, MaxHp = 1500f, AtkMul = 1.25f,
                 SwingDmg = new[] { 40f, 48, 60, 105 }, SwingDur = new[] { 0.3f, 0.3f, 0.4f, 0.58f },
                 SkillCd = 8f, SkillName = "レポート提出", BurstName = "一夜漬け・雷光乱舞", BurstShout = "徹夜の力、見せでやる！",
                 Hair = new Color(0.3f, 0.22f, 0.45f), Jacket = new Color(0.16f, 0.18f, 0.32f), Pants = new Color(0.12f, 0.12f, 0.2f),
@@ -36,9 +36,9 @@ namespace AndoBoss
             },
             new CharDef
             {
-                Id = 1, Name = "杉山くん", Title = "炎のラグビー部", Elem = Elem.Pyro, Weapon = Weapon.Fist, Height = 1.08f,
+                Id = 1, Name = "杉山くん", Title = "炎のラグビー部", Elem = Elem.Pyro, Weapon = Weapon.Fist, Height = 1.08f, MaxHp = 1500f, AtkMul = 1.7f,
                 SwingDmg = new[] { 60f, 72, 130 }, SwingDur = new[] { 0.38f, 0.38f, 0.62f },
-                SkillCd = 8f, SkillName = "炎のロングパス", BurstName = "ラグビー部タックル", BurstShout = "どけどけぇ！ラグビー部だ！",
+                SkillCd = 8f, SkillName = "炎のロングパス", Passive = "特技を当てると、ボスの防御力が8秒間下がる（受けるダメージ1.3倍）", BurstName = "ラグビー部タックル", BurstShout = "どけどけぇ！ラグビー部だ！",
                 Hair = new Color(0.2f, 0.14f, 0.1f), Jacket = new Color(0.72f, 0.16f, 0.12f), Pants = new Color(0.95f, 0.95f, 0.95f),
                 Accent = new Color(1f, 0.55f, 0.2f), Eye = new Color(0.8f, 0.35f, 0.15f), Skin = new Color(0.93f, 0.78f, 0.64f), Spiky = true,
             },
@@ -48,6 +48,7 @@ namespace AndoBoss
                 SwingDmg = new[] { 38f, 38, 45, 90 }, SwingDur = new[] { 0.34f, 0.34f, 0.36f, 0.55f },
                 SkillCd = 9f, SkillName = "二度寝アロー", BurstName = "寝ぼけ乱れ撃ち", BurstShout = "ねみぃ……全部撃っとくか。",
                 Passive = "留年：1回やられても生き返り、極太の矢を2本撃ち返す（1戦に1回）",
+                MaxHp = 1000f,
                 Hair = new Color(0.25f, 0.35f, 0.3f), Jacket = new Color(0.3f, 0.5f, 0.42f), Pants = new Color(0.2f, 0.22f, 0.26f),
                 Accent = new Color(0.55f, 1f, 0.75f), Eye = new Color(0.3f, 0.75f, 0.55f), Skin = new Color(0.98f, 0.88f, 0.8f), Glasses = true, Sleepy = true,
             },

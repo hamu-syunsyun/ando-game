@@ -13,7 +13,7 @@ namespace AndoBoss
         public const float MaxTough = 4200f;
 
         public Vector3 Pos;
-        public float Y, Face, Hp, LagHp, Tough, BreakT, Flash, SinkT, FreezeT;
+        public float Y, Face, Hp, LagHp, Tough, BreakT, Flash, SinkT, FreezeT, DefDownT;
         public Elem Aura; public float AuraT;
         public int Phase = 1;
         public bool Alive => Hp > 0;
@@ -181,7 +181,7 @@ namespace AndoBoss
         public void ResetState()
         {
             Pos = new Vector3(0, 0, 7); Y = 0; Face = Mathf.PI; Hp = MaxHp; LagHp = MaxHp; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
-            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; Aura = Elem.None; AuraT = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
+            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; Aura = Elem.None; AuraT = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
             restT = 1.2f; lastAtk = null; atk = null;
             aura.SetActive(false);
             dizzy.SetActive(false);
@@ -247,6 +247,7 @@ namespace AndoBoss
             }
 
             AuraT -= dt;
+            DefDownT = Mathf.Max(0, DefDownT - dt);
             if (AuraT <= 0) Aura = Elem.None;
             if (FreezeT > 0)
             {
