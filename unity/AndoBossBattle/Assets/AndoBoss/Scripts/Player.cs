@@ -4,7 +4,7 @@ using UnityEngine;
 namespace AndoBoss
 {
     // 操作キャラ（ともき・杉山くん・やましょう の3人で共通のしくみ）。
-    // 見た目・攻撃力・スキル・元素爆発は CharDef で切り替える
+    // 見た目・攻撃力・スキル・奥義は CharDef で切り替える
     public class Player : MonoBehaviour
     {
         public const float MaxHp = 1000f;
@@ -12,7 +12,8 @@ namespace AndoBoss
 
         // 状態（HPとスタミナはパーティ共通なので Game が持つ）
         public Vector3 Pos;
-        public float Vy, Face, Inv, Dodge, DodgeAge, SkillCd, Energy, HurtT, BuffT, BurstT, DeadT, SwapInT;
+        public float Vy, Face, Inv, Dodge, DodgeAge, SkillCd, Energy, HurtT, BuffT, BurstT, DeadT, SwapInT, LockT;
+        Vector3 knock;
         public float Hp { get => Game.I.PartyHp; set => Game.I.PartyHp = value; }
         public float Stam { get => Game.I.PartyStam; set => Game.I.PartyStam = value; }
         public bool OnGround, Moving, Dead, Victory;
@@ -22,7 +23,7 @@ namespace AndoBoss
         Swing swing;
         int comboIdx; float comboTimer; bool queued;
         float walkT, idleT, elemIcd;
-        public bool CanAct => !Dead && !Victory && Game.I.State == Game.Mode.Battle && BurstT <= 0;
+        public bool CanAct => !Dead && !Victory && Game.I.State == Game.Mode.Battle && BurstT <= 0 && LockT <= 0 && HurtT <= 0.2f;
         int LastIdx => Def.SwingDur.Length - 1;
 
         // 見た目
@@ -67,7 +68,7 @@ namespace AndoBoss
             Mat.Part(body, Mat.Frustum(0.27f, 0.22f, 0.22f, 14), jacket, new Vector3(0, ty + 0.05f, 0), Vector3.one);
             for (int i = 0; i < 3; i++) Mat.Part(body, Mat.Sphere, gold, new Vector3(0, ty + 0.46f - i * 0.13f, 0.2f + i * 0.008f), Vector3.one * 0.045f);
             Mat.Part(body, Mat.Frustum(0.14f, 0.12f, 0.08f, 12), white, new Vector3(0, ty + 0.6f, 0), Vector3.one);
-            // マフラー（元素の色）
+            // マフラー（属性の色）
             Mat.Part(body, Mat.Frustum(0.18f, 0.15f, 0.1f, 14), accent, new Vector3(0, ty + 0.59f, 0), Vector3.one);
             scarfA = Mat.Pivot(body, "scarfA", new Vector3(0.06f, ty + 0.58f, -0.13f));
             scarfB = Mat.Pivot(body, "scarfB", new Vector3(-0.06f, ty + 0.58f, -0.13f));
@@ -113,6 +114,7 @@ namespace AndoBoss
                 Mat.Part(head, Mat.Sphere, white, new Vector3(x + 0.016f, 0.237f, 0.222f), new Vector3(0.018f, 0.018f, 0.008f), default, false);
                 Mat.Part(head, Mat.Cube, hair, new Vector3(x, 0.3f, 0.2f), new Vector3(0.085f, 0.016f, 0.02f), new Vector3(0, 0, x > 0 ? 8 : -8), false);
                 if (def.Glasses) Mat.Part(head, Mat.Torus(0.05f, 0.008f, 16, 5), black, new Vector3(x, 0.22f, 0.23f), Vector3.one, default, false);
+                if (def.Sleepy) Mat.Part(head, Mat.Sphere, skin, new Vector3(x, 0.245f, 0.212f), new Vector3(0.09f, 0.055f, 0.045f), default, false); // 半目
             }
             Mat.Part(head, Mat.Sphere, skin, new Vector3(0, 0.17f, 0.22f), new Vector3(0.04f, 0.06f, 0.04f), default, false); // 鼻
             Mat.Part(head, Mat.Cube, M(new Color(0.7f, 0.35f, 0.35f), 0), new Vector3(0, 0.09f, 0.215f), new Vector3(0.055f, 0.01f, 0.01f), default, false);
@@ -134,25 +136,23 @@ namespace AndoBoss
             Vector3 tipLocal;
             switch (def.Weapon)
             {
-                case Weapon.Iron:
-                    // はんだごて：持ち手・細い金属棒・赤く光る先端
-                    Mat.Part(grip, Mat.Frustum(0.05f, 0.045f, 0.34f, 10), M(new Color(0.85f, 0.35f, 0.15f), 0.01f), new Vector3(0, 0, -0.05f), Vector3.one, new Vector3(90, 0, 0));
-                    Mat.Part(grip, Mat.Frustum(0.055f, 0.055f, 0.06f, 10), M(new Color(0.3f, 0.3f, 0.32f), 0), new Vector3(0, 0, 0.14f), Vector3.one, new Vector3(90, 0, 0));
-                    Mat.Part(grip, Mat.Frustum(0.03f, 0.025f, 1.1f, 8), M(new Color(0.75f, 0.76f, 0.78f), 0.008f), new Vector3(0, 0, 0.72f), Vector3.one, new Vector3(90, 0, 0));
-                    bladeMat = Mat.Toon(new Color(1f, 0.55f, 0.3f), 0.006f, new Color(1f, 0.45f, 0.15f, 0.5f));
+                case Weapon.Fist:
+                    // 炎をまとった拳（ラグビーのグローブ風）
+                    bladeMat = Mat.Toon(new Color(1f, 0.55f, 0.3f), 0.01f, new Color(1f, 0.45f, 0.15f, 0.5f));
                     mats.Add(bladeMat);
-                    Mat.Part(grip, Mat.Frustum(0.03f, 0.0f, 0.22f, 8), bladeMat, new Vector3(0, 0, 1.38f), Vector3.one, new Vector3(90, 0, 0));
-                    tipLocal = new Vector3(0, 0, 1.4f);
+                    Mat.Part(grip, Mat.Sphere, bladeMat, Vector3.zero, Vector3.one * 0.2f);
+                    tipLocal = new Vector3(0, 0, 0.05f);
                     break;
-                case Weapon.Ruler:
-                    // 長い定規（氷をまとって光る）
-                    Mat.Part(grip, Mat.Frustum(0.035f, 0.035f, 0.3f, 8), M(new Color(0.2f, 0.25f, 0.35f), 0.01f), new Vector3(0, 0, -0.08f), Vector3.one, new Vector3(90, 0, 0));
-                    bladeMat = Mat.Toon(new Color(0.85f, 0.95f, 1f), 0.01f, new Color(0.5f, 0.85f, 1f, 0.35f));
+                case Weapon.Bow:
+                    // 弓：持ち手・上下の弓幹・弦（縦向き）
+                    bladeMat = Mat.Toon(new Color(0.85f, 1f, 0.9f), 0.01f, new Color(0.5f, 1f, 0.7f, 0.3f));
                     mats.Add(bladeMat);
-                    Mat.Part(grip, Mat.Cube, bladeMat, new Vector3(0, 0, 0.85f), new Vector3(0.16f, 0.02f, 1.5f));
-                    for (int i = 0; i < 12; i++)
-                        Mat.Part(grip, Mat.Cube, M(new Color(0.2f, 0.3f, 0.45f), 0), new Vector3(0.06f, 0.012f, 0.15f + i * 0.12f), new Vector3(0.04f, 0.005f, 0.008f), default, false);
-                    tipLocal = new Vector3(0, 0, 1.6f);
+                    var wood = M(new Color(0.35f, 0.25f, 0.18f), 0.01f);
+                    Mat.Part(grip, Mat.Frustum(0.035f, 0.035f, 0.22f, 8), wood, Vector3.zero, Vector3.one);
+                    Mat.Part(grip, Mat.Frustum(0.03f, 0.015f, 0.62f, 8), bladeMat, new Vector3(0, 0.36f, 0.08f), Vector3.one, new Vector3(-18, 0, 0));
+                    Mat.Part(grip, Mat.Frustum(0.015f, 0.03f, 0.62f, 8), bladeMat, new Vector3(0, -0.36f, 0.08f), Vector3.one, new Vector3(18, 0, 0));
+                    Mat.Part(grip, Mat.Cube, white, new Vector3(0, 0, -0.03f), new Vector3(0.008f, 1.28f, 0.008f), default, false);
+                    tipLocal = new Vector3(0, 0, 0.2f);
                     break;
                 default:
                     Mat.Part(grip, Mat.Frustum(0.035f, 0.035f, 0.26f, 8), M(new Color(0.25f, 0.18f, 0.3f), 0.01f), new Vector3(0, 0, -0.08f), Vector3.one, new Vector3(90, 0, 0));
@@ -169,7 +169,7 @@ namespace AndoBoss
             trail = tip.gameObject.AddComponent<TrailRenderer>();
             trail.time = 0.14f;
             trail.minVertexDistance = 0.05f;
-            trail.widthMultiplier = def.Weapon == Weapon.Iron ? 0.6f : 0.9f;
+            trail.widthMultiplier = def.Weapon == Weapon.Fist ? 0.5f : def.Weapon == Weapon.Bow ? 0f : 0.9f;
             trail.widthCurve = new AnimationCurve(new Keyframe(0, 1), new Keyframe(1, 0));
             var g = new Gradient();
             g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(ec, 0.3f), new GradientColorKey(ec * 0.6f, 1) },
@@ -187,7 +187,7 @@ namespace AndoBoss
         {
             Pos = new Vector3(0, 0, -9);
             Vy = 0; Face = 0; Inv = 0; Dodge = 0; SkillCd = 0; Energy = 40;
-            HurtT = 0; BuffT = 0; BurstT = 0; DeadT = 0; OnGround = true; Dead = false; Victory = false; SwapInT = 0;
+            HurtT = 0; BuffT = 0; BurstT = 0; DeadT = 0; OnGround = true; Dead = false; Victory = false; SwapInT = 0; LockT = 0; knock = Vector3.zero;
             swing = null; comboIdx = 0; comboTimer = 0; queued = false; elemIcd = 0;
             transform.position = Pos;
             body.localRotation = Quaternion.identity;
@@ -199,7 +199,7 @@ namespace AndoBoss
         public void EnterField(Vector3 pos, float face)
         {
             Pos = pos; Face = face; Vy = 0; OnGround = pos.y <= 0.01f;
-            swing = null; Dodge = 0; queued = false; comboIdx = 0;
+            swing = null; Dodge = 0; queued = false; comboIdx = 0; knock = Vector3.zero; HurtT = 0; LockT = 0;
             SwapInT = 0.35f;
             Inv = Mathf.Max(Inv, 0.4f);
             lastPos = Pos;
@@ -228,13 +228,14 @@ namespace AndoBoss
         {
             swing = new Swing { t = 0, dur = Def.SwingDur[comboIdx], idx = comboIdx, face = FaceForAttack() };
             bool fin = comboIdx == LastIdx;
-            Sfx.Play(fin ? "slash3" : "slash" + (comboIdx % 3), 0.8f, (Def.Weapon == Weapon.Iron ? 0.8f : Def.Weapon == Weapon.Ruler ? 1.15f : 1f) * (fin ? 0.9f : 1f), 0.08f);
+            if (Def.Weapon == Weapon.Bow) Sfx.Play("arrow", 0.7f, fin ? 0.85f : 1f, 0.08f);
+            else Sfx.Play(fin ? "slash3" : "slash" + (comboIdx % 3), 0.8f, (Def.Weapon == Weapon.Fist ? 0.75f : 1f) * (fin ? 0.9f : 1f), 0.08f);
             trail.Clear();
             trail.emitting = true;
             queued = false;
         }
 
-        // 通常攻撃の元素は、一定間隔でだけ付く（毎回付くと反応が起きすぎる）
+        // 通常攻撃の属性は、一定間隔でだけ付く（毎回付くと反応が起きすぎる）
         Elem NormalElem()
         {
             if (elemIcd > 0) return Elem.None;
@@ -245,14 +246,22 @@ namespace AndoBoss
         void MeleeHit(Swing sw)
         {
             var G = Game.I; var B = G.Boss;
+            if (Def.Weapon == Weapon.Bow)
+            {
+                // やましょうは「ねみー」と言いながら矢を撃つ
+                bool last = sw.idx == LastIdx;
+                G.Hud.WorldText(Pos + Vector3.up * 2.4f, last ? "ねみぃぃ……" : "ねみー", new Color(0.8f, 1f, 0.9f), 0.6f);
+                Skills.Arrow(this, Def.SwingDmg[sw.idx] * Def.AtkMul, last ? 3 : 1, NormalElem());
+                return;
+            }
             Vector3 fwd = new Vector3(Mathf.Sin(Face), 0, Mathf.Cos(Face));
             var tipPos = Pos + fwd * 1.5f + Vector3.up * 1.1f;
             Fx.Sparks(tipPos, Color.Lerp(Def.ElemColor, Color.white, 0.4f), 5, 0.6f);
             bool fin = sw.idx == LastIdx;
             float d = Flat(B.Pos - Pos).magnitude;
             float dir = Mathf.Atan2(B.Pos.x - Pos.x, B.Pos.z - Pos.z);
-            bool inArc = AngDiff(Face, dir) < (fin && Def.Weapon != Weapon.Iron ? Mathf.PI : 1.5f);
-            float reach = Boss.Radius + (fin ? 3.2f : 2.5f) + (Def.Weapon == Weapon.Ruler ? 0.4f : 0);
+            bool inArc = AngDiff(Face, dir) < (fin && Def.Weapon != Weapon.Fist ? Mathf.PI : 1.5f);
+            float reach = Boss.Radius + (fin ? 3.2f : 2.5f) - (Def.Weapon == Weapon.Fist ? 0.4f : 0);
             if (B.Alive && d < reach && inArc && B.Y < 2.5f)
             {
                 var hitPos = B.Pos + Vector3.up * 2.2f - Flat(B.Pos - Pos).normalized * Boss.Radius;
@@ -260,7 +269,7 @@ namespace AndoBoss
                 if (fin) { G.Cam.Shake(0.25f); Fx.Ring(Pos + fwd * 1.5f, 3.5f, Def.ElemColor, 0.3f); }
             }
             else if (fin) Fx.Ring(Pos + fwd * 1.2f, 3.2f, Def.ElemColor, 0.3f);
-            if (fin && Def.Weapon == Weapon.Iron) { Fx.Debris(Pos + fwd * 1.6f, new Color(1f, 0.6f, 0.3f), 10); Sfx.Play("fire", 0.4f, 1.3f); }
+            if (Def.Weapon == Weapon.Fist) { Fx.Explosion(Pos + fwd * 1.3f + Vector3.up * 1.1f, Def.ElemColor, fin ? 0.9f : 0.35f); Sfx.Play("fire", fin ? 0.6f : 0.3f, 1.3f); }
         }
 
         void TryDodge()
@@ -294,8 +303,8 @@ namespace AndoBoss
             switch (Def.Id)
             {
                 case 0: Skills.Report(this); break;
-                case 1: Skills.Solder(this); break;
-                default: Skills.Nitrogen(this); break;
+                case 1: Skills.RugbyPass(this); break;
+                default: Skills.NidoneArrow(this); break;
             }
         }
 
@@ -318,8 +327,9 @@ namespace AndoBoss
             SkillCd = Mathf.Max(0, SkillCd - dt);
             BuffT = Mathf.Max(0, BuffT - dt);
             SwapInT = Mathf.Max(0, SwapInT - dt);
+            LockT = Mathf.Max(0, LockT - dt);
             elemIcd = Mathf.Max(0, elemIcd - dt);
-            if (G.State == Game.Mode.Battle && !Dead) Energy = Mathf.Min(100, Energy + dt * 1.2f);
+            if (G.State == Game.Mode.Battle && !Dead) Energy = Mathf.Min(100, Energy + dt * 0.6f);
 
             Vy -= 26 * dt;
             Pos.y += Vy * dt;
@@ -330,6 +340,7 @@ namespace AndoBoss
             }
 
             Moving = false;
+            if (knock.sqrMagnitude > 0.01f) { Pos += knock * dt; knock = Vector3.Lerp(knock, Vector3.zero, dt * 6); }
             float spd = G.SlowT > 0 ? 0.5f : 1f;
             if (BurstT > 0)
             {
@@ -414,18 +425,28 @@ namespace AndoBoss
         }
 
         // 攻撃を受けたとき。当たったら true
-        public bool TakeHit(float amount)
+        public bool TakeHit(float amount) => TakeHit(amount, Game.I.Boss.Pos);
+        public bool TakeHit(float amount, Vector3 from)
         {
             var G = Game.I;
             if (Dead || Victory || G.State != Game.Mode.Battle) return false;
             if (Dodge > 0)
             {
-                if (!perfectUsed && DodgeAge < 0.24f) { perfectUsed = true; G.PerfectDodge(); }
-                return false;
+                // ジャスト回避は回避の出だし 0.1 秒だけ。無敵は 0.22 秒まで
+                if (!perfectUsed && DodgeAge < 0.1f) { perfectUsed = true; G.PerfectDodge(); return false; }
+                if (DodgeAge < 0.22f) return false;
             }
             if (Inv > 0) return false;
+            amount *= Game.I.EnemyDmgMul;
             Hp = Mathf.Max(0, Hp - amount);
-            Inv = 0.7f; HurtT = 0.45f;
+            Inv = 0.8f; HurtT = 0.5f;
+            // ノックバック：攻撃の来た方向から吹き飛ばされる
+            var away = Flat(Pos - from);
+            if (away.sqrMagnitude < 0.01f) away = -Forward;
+            knock = away.normalized * (7f + amount * 0.02f);
+            Vy = Mathf.Max(Vy, 4.5f); OnGround = false;
+            Face = Mathf.Atan2(-away.x, -away.z);
+            Dodge = 0;
             flash = 1; flashC = new Color(1, 0.3f, 0.3f);
             swing = null; trail.emitting = false;
             G.OnPlayerHurt(amount);
@@ -481,15 +502,15 @@ namespace AndoBoss
                 float e = u < 0.45f ? Mathf.SmoothStep(0, 1, u / 0.45f) : 1;
                 int pattern;
                 bool fin = swing.idx == LastIdx;
-                if (fin) pattern = Def.Weapon == Weapon.Iron ? 2 : 3;
-                else if (Def.Weapon == Weapon.Ruler && swing.idx >= 2) pattern = 4;
+                if (Def.Weapon == Weapon.Bow) pattern = 5;
+                else if (fin) pattern = Def.Weapon == Weapon.Fist ? 2 : 3;
                 else pattern = swing.idx % 2;
                 switch (pattern)
                 {
                     case 0: swordRot = Quaternion.Euler(0, Mathf.Lerp(110, -80, e), -30); lean = 10; break;
                     case 1: swordRot = Quaternion.Euler(0, Mathf.Lerp(-100, 90, e), 25); lean = 10; break;
                     case 2: swordRot = Quaternion.Euler(Mathf.Lerp(-120, 50, e), -5, 0); lean = Mathf.Lerp(-10, 25, e); break;
-                    case 4: swordRot = Quaternion.Euler(Mathf.Lerp(-10, 5, e), Mathf.Lerp(20, 0, e), 0); lean = Mathf.Lerp(-5, 20, e); break; // 突き
+                    case 5: swordRot = Quaternion.Euler(0, 0, 0); armLRot = Quaternion.Euler(-80, 0, 20); lean = -4; break; // 弓を構えて引く
                     default:
                         spin = Mathf.Lerp(0, 360, Mathf.SmoothStep(0, 1, Mathf.Clamp01(u / 0.55f)));
                         swordRot = Quaternion.Euler(10, 70, 0);
@@ -556,6 +577,7 @@ namespace AndoBoss
             var ec = Def.ElemColor;
             float glowA = 0.3f + (BuffT > 0 ? 0.4f + 0.15f * Mathf.Sin(idleT * 20) : 0) + (swing != null ? 0.2f : 0);
             bladeMat.SetColor("_Emission", new Color(ec.r, ec.g, ec.b, glowA));
+            if (Def.Weapon == Weapon.Fist && Random.value < 0.35f) Fx.Embers(swordPivot.position + swordPivot.forward * 0.1f, ec, 1);
             if (BuffT > 0 && Random.value < 0.3f) Fx.Embers(transform.position + Vector3.up * Random.Range(0.5f, 1.8f) + Random.insideUnitSphere * 0.4f, ec, 1);
 
             flash = Mathf.MoveTowards(flash, 0, dt * 5);

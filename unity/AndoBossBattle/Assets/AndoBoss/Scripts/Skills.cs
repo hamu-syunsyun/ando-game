@@ -2,13 +2,13 @@ using UnityEngine;
 
 namespace AndoBoss
 {
-    // 3人の元素スキル（E）と元素爆発（Q）
+    // 3人の特技（E）と奥義（Q）
     public static class Skills
     {
         static Game G => Game.I;
         static Boss B => Game.I.Boss;
 
-        // ================= 元素スキル =================
+        // ================= 特技 =================
 
         // ともき「レポート提出」：雷をまとったレポートを投げつける。刺さるとバババババッと連続ヒット
         public static void Report(Player p)
@@ -87,61 +87,132 @@ namespace AndoBoss
             });
         }
 
-        // 杉山くん「はんだ付け」：ボスの足元にはんだを流し込み、火柱を立てる
-        public static void Solder(Player p)
+        // 杉山くん「炎のロングパス」：炎をまとったラグビーボールを投げる。着弾で爆発
+        public static void RugbyPass(Player p)
         {
             var ec = p.Def.ElemColor;
-            var target = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 14 ? Player.Flat(B.Pos) : Player.Flat(p.Pos + p.Forward * 7);
-            Sfx.Play("whoosh", 0.8f, 0.7f);
-            Fx.Ring(target, 3.8f, ec, 0.3f);
-            Fx.Sparks(p.HandPos, ec, 10, 0.8f);
-            Fx.Later(0.3f, () =>
+            Sfx.Play("whoosh", 0.9f, 0.7f);
+            var ball = new GameObject("rugby");
+            Mat.Part(ball.transform, Mat.Sphere, Mat.ToonShared(new Color(0.55f, 0.3f, 0.15f), 0.02f), Vector3.zero, new Vector3(0.45f, 0.45f, 0.75f));
+            Mat.Part(ball.transform, Mat.Cube, Mat.ToonShared(Color.white), new Vector3(0, 0.22f, 0), new Vector3(0.05f, 0.03f, 0.4f), default, false);
+            var glow = Mat.Part(ball.transform, Mat.Quad, Mat.FxShared(new Color(ec.r, ec.g, ec.b, 0.9f), Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 1.8f, default, false);
+            glow.AddComponent<Billboard>();
+            var start = p.HandPos + Vector3.up * 0.5f;
+            var target = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 18 ? B.Pos + Vector3.up * 2f : p.Pos + p.Forward * 10;
+            float t = 0; const float dur = 0.55f;
+            Fx.Run(dt =>
             {
-                Fx.Pillar(target, ec, 3.2f, 8f, 1.3f);
-                bool first = true;
-                for (int i = 0; i < 3; i++)
+                t += dt;
+                float u = Mathf.Clamp01(t / dur);
+                var tgt = B.Alive ? Vector3.Lerp(target, B.Pos + Vector3.up * 2f, u) : target;
+                ball.transform.position = Vector3.Lerp(start, tgt, u) + Vector3.up * Mathf.Sin(u * Mathf.PI) * 3f;
+                ball.transform.rotation = Quaternion.LookRotation((tgt - start).normalized) * Quaternion.Euler(0, 0, t * 900);
+                Fx.Embers(ball.transform.position, ec, 2);
+                if (u >= 1)
                 {
-                    Fx.Later(i * 0.4f, () =>
+                    var hp = ball.transform.position;
+                    Fx.Explosion(hp, ec, 1.6f);
+                    Fx.Pillar(Player.Flat(hp), ec, 2.5f, 6f, 0.7f);
+                    Sfx.Play("explode", 0.9f);
+                    G.Cam.Shake(0.3f);
+                    G.Hud.WorldText(hp + Vector3.up * 2.5f, "トライ！", ec, 1f);
+                    if (B.Alive && Player.Flat(B.Pos - hp).magnitude < 4f + Boss.Radius)
                     {
-                        Sfx.Play("fire", 0.9f, 1 + Random.Range(-0.1f, 0.1f));
-                        Fx.Explosion(target + Vector3.up * 0.5f, ec, 0.8f);
-                        G.Cam.Shake(0.15f);
-                        if (B.Alive && Player.Flat(B.Pos - target).magnitude < 3.8f + Boss.Radius && B.Y < 4)
-                        {
-                            G.DamageBoss(95, Game.HitKind.Skill, B.Pos + Vector3.up * 2.2f, Elem.Pyro);
-                            if (first) { first = false; G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 3); }
-                        }
-                    });
+                        G.DamageBoss(210, Game.HitKind.Skill, B.Pos + Vector3.up * 2.4f, Elem.Pyro);
+                        G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 2);
+                    }
+                    return false;
                 }
-            });
+                return true;
+            }, ball);
         }
 
-        // やましょう「液体窒素」：周りを一瞬で凍らせる
-        public static void Nitrogen(Player p)
+        // やましょうの通常攻撃：風をまとった矢（count 本を少し広げて撃つ）
+        public static void Arrow(Player p, float dmg, int count, Elem elem)
         {
             var ec = p.Def.ElemColor;
-            Sfx.Play("ice", 1f);
-            Sfx.Play("whoosh", 0.6f, 0.6f);
-            Fx.Ring(p.Pos, 6f, ec, 0.35f);
-            Fx.Ring(p.Pos, 4f, Color.white, 0.25f);
-            Fx.Debris(p.Pos + Vector3.up * 0.5f, new Color(0.9f, 0.97f, 1f, 0.8f), 30);
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < count; i++)
             {
-                float a = i / 10f * Mathf.PI * 2 + Random.value * 0.3f;
-                Fx.IceSpike(p.Pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * Random.Range(2f, 5f), Random.Range(1f, 2.2f));
+                int k = i;
+                float spread = (k - (count - 1) / 2f) * 0.12f;
+                Shoot(p.HandPos + Vector3.up * 0.1f, p.Face + spread, ec, 1f, 45f, target =>
+                {
+                    G.DamageBoss(dmg, Game.HitKind.Normal, target, k == 0 ? elem : Elem.None);
+                });
             }
-            G.Cam.Shake(0.2f);
-            if (B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 5.8f + Boss.Radius && B.Y < 3)
+        }
+
+        static void Shoot(Vector3 from, float face, Color c, float size, float speed, System.Action<Vector3> onHit)
+        {
+            var go = new GameObject("arrow");
+            go.transform.position = from;
+            Mat.Part(go.transform, Mat.Cylinder, Mat.ToonShared(new Color(0.9f, 0.9f, 0.85f)), Vector3.zero, new Vector3(0.05f, 0.8f, 0.05f) * size, new Vector3(90, 0, 0), false);
+            Mat.Part(go.transform, Mat.Frustum(0.07f, 0f, 0.2f, 6), Mat.ToonShared(new Color(0.7f, 0.75f, 0.8f)), new Vector3(0, 0, 0.5f * size), Vector3.one * size, new Vector3(90, 0, 0), false);
+            var glow = Mat.Part(go.transform, Mat.Quad, Mat.FxShared(new Color(c.r, c.g, c.b, 0.9f), Mat.Glow, true, 2.5f), new Vector3(0, 0, 0.4f * size), Vector3.one * 0.9f * size, default, false);
+            glow.AddComponent<Billboard>();
+            var tr = go.AddComponent<TrailRenderer>();
+            tr.time = 0.15f; tr.widthMultiplier = 0.25f * size;
+            tr.widthCurve = new AnimationCurve(new Keyframe(0, 1), new Keyframe(1, 0));
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(c, 1) }, new[] { new GradientAlphaKey(0.8f, 0), new GradientAlphaKey(0, 1) });
+            tr.colorGradient = g;
+            tr.sharedMaterial = Mat.FxShared(Color.white, Mat.White, true, 2f);
+            var dir = new Vector3(Mathf.Sin(face), 0, Mathf.Cos(face));
+            float t = 0;
+            Fx.Run(dt =>
             {
-                G.DamageBoss(230, Game.HitKind.Skill, B.Pos + Vector3.up * 2.4f, Elem.Cryo);
-                G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 3);
-                for (int i = 0; i < 4; i++) Fx.IceSpike(B.Pos + Random.insideUnitSphere.Flat() * 2, 2.5f);
+                t += dt;
+                var pos = go.transform.position;
+                // ボスの方へ少しだけ曲がる
+                if (B.Alive)
+                {
+                    var to = (B.Pos + Vector3.up * (B.Y + 2.3f)) - pos;
+                    if (to.magnitude < 20) dir = Vector3.Slerp(dir, to.normalized, dt * 5);
+                    if (to.magnitude < 1.4f + Boss.Radius * 0.5f)
+                    {
+                        onHit(pos);
+                        Fx.Sparks(pos, c, 8, 0.8f);
+                        return false;
+                    }
+                }
+                go.transform.position = pos + dir * speed * dt;
+                go.transform.rotation = Quaternion.LookRotation(dir);
+                return t < 1.2f;
+            }, go);
+        }
+
+        // やましょう「二度寝アロー」：空に矢を放つと、しばらくして矢の雨が降る
+        public static void NidoneArrow(Player p)
+        {
+            var ec = p.Def.ElemColor;
+            Sfx.Play("arrow", 1f, 0.8f);
+            G.Hud.WorldText(p.Pos + Vector3.up * 2.6f, "あと5分……", new Color(0.8f, 1f, 0.9f), 0.8f);
+            Fx.Sparks(p.HandPos, ec, 10, 1f);
+            var center = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 20 ? Player.Flat(B.Pos) : Player.Flat(p.Pos + p.Forward * 8);
+            Fx.Ring(center, 4.5f, ec, 0.6f);
+            bool first = true;
+            for (int i = 0; i < 14; i++)
+            {
+                int k = i;
+                Fx.Later(0.6f + k * 0.07f, () =>
+                {
+                    var c2 = B.Alive ? Player.Flat(B.Pos) : center;
+                    var land = c2 + new Vector3(Random.Range(-3.5f, 3.5f), 0, Random.Range(-3.5f, 3.5f));
+                    Fx.SlashLine(land + Vector3.up * 4, ec, 7);
+                    Fx.Debris(land + Vector3.up * 0.2f, new Color(0.8f, 1f, 0.9f, 0.7f), 3);
+                    Sfx.Play("multihit", 0.4f, 1.3f);
+                    if (B.Alive && Player.Flat(B.Pos - land).magnitude < Boss.Radius + 1.8f)
+                    {
+                        G.DamageBoss(42, Game.HitKind.Skill, B.Pos + Vector3.up * 2.5f + Random.insideUnitSphere, first ? Elem.Wind : Elem.None, true);
+                        if (first) { first = false; G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 2); }
+                    }
+                });
             }
         }
 
         static Vector3 Flat(this Vector3 v) => new Vector3(v.x, 0, v.z);
 
-        // ================= 元素爆発 =================
+        // ================= 奥義 =================
 
         // ともき「一夜漬け・雷光乱舞」：夜が来て、目にも止まらぬ連続斬り → 〆切斬り
         public static void TomokiBurst(Player p)
@@ -183,64 +254,107 @@ namespace AndoBoss
             });
         }
 
-        // 杉山くん「ショート回路」：ボスの周りの回路が次々ショートして大爆発
+        // 杉山くん「ラグビー部タックル」：炎をまとって何度もボスに突っこみ、最後に全力タックル
         public static void SugiyamaBurst(Player p)
         {
             var ec = p.Def.ElemColor;
-            for (int i = 0; i < 7; i++)
+            p.LockT = 2.2f;
+            p.Inv = Mathf.Max(p.Inv, 2.6f);
+            int passes = 3; float passDur = 0.32f;
+            float t = 0; int pass = -1; Vector3 from = p.Pos, to = p.Pos; bool hitThis = false;
+            Fx.Run(dt =>
             {
-                int k = i;
-                Fx.Later(0.05f + k * 0.13f, () =>
+                if (!B.Alive || G.State != Game.Mode.Battle) { p.LockT = 0; return false; }
+                t += dt;
+                int cur = Mathf.FloorToInt(t / passDur);
+                if (cur != pass)
                 {
-                    if (!B.Alive || G.State != Game.Mode.Battle) return;
-                    float a = k / 7f * Mathf.PI * 2;
-                    var pos = B.Pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 3f;
-                    Fx.Explosion(pos + Vector3.up, ec, 1.2f);
-                    Sfx.Play("explode", 0.6f, 1.1f + k * 0.03f);
-                    G.DamageBoss(130, Game.HitKind.Burst, B.Pos + Vector3.up * 2.5f + Random.insideUnitSphere, k == 0 ? Elem.Pyro : Elem.None);
-                    G.Cam.Shake(0.25f);
-                });
-            }
-            Fx.Later(1.2f, () =>
-            {
-                if (!B.Alive || G.State != Game.Mode.Battle) return;
-                Fx.Pillar(Player.Flat(B.Pos), ec, 5f, 16f, 1.2f);
-                Fx.Explosion(B.Pos + Vector3.up * 2, ec, 2.5f);
-                Fx.Ring(B.Pos, 12, ec, 0.6f, 3f);
-                G.Hud.WorldText(B.Pos + Vector3.up * 6f, "ショート！！", ec, 1.4f);
-                Sfx.Play("explode", 1f, 0.8f);
-                Finale(480, Elem.Pyro);
+                    pass = cur;
+                    hitThis = false;
+                    from = p.Pos;
+                    if (pass < passes)
+                    {
+                        // ボスを通り抜けて反対側へ
+                        float a = Random.value * Mathf.PI * 2;
+                        var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+                        from = B.Pos - d * 6f; to = B.Pos + d * 6f;
+                        p.Pos = new Vector3(from.x, 0, from.z);
+                        Sfx.Play("whoosh", 0.9f, 0.7f);
+                    }
+                    else
+                    {
+                        var d = Player.Flat(B.Pos - p.Pos).normalized;
+                        to = B.Pos - d * (Boss.Radius + 0.8f);
+                    }
+                }
+                float u = Mathf.Clamp01((t - pass * passDur) / passDur);
+                var pos = Vector3.Lerp(from, to, u);
+                p.Pos = new Vector3(pos.x, 0, pos.z);
+                var dir = Player.Flat(to - from);
+                if (dir.sqrMagnitude > 0.01f) p.Face = Mathf.Atan2(dir.x, dir.z);
+                Fx.Embers(p.Pos + Vector3.up * Random.Range(0.3f, 1.6f), ec, 3);
+                if (Random.value < 0.5f) Fx.Debris(p.Pos, new Color(0.8f, 0.75f, 0.64f), 1);
+                if (pass < passes && !hitThis && u > 0.5f)
+                {
+                    hitThis = true;
+                    Fx.Explosion(B.Pos + Vector3.up * 2, ec, 1f);
+                    Sfx.Play("stomp", 0.9f, 1.1f);
+                    G.Cam.Shake(0.35f);
+                    G.DamageBoss(150, Game.HitKind.Burst, B.Pos + Vector3.up * 2.2f, pass == 0 ? Elem.Pyro : Elem.None);
+                }
+                if (pass >= passes && u >= 1)
+                {
+                    p.LockT = 0;
+                    Fx.Pillar(Player.Flat(B.Pos), ec, 5f, 14f, 1.2f);
+                    Fx.Explosion(B.Pos + Vector3.up * 2, ec, 2.5f);
+                    Fx.Ring(B.Pos, 12, ec, 0.6f, 3f);
+                    G.Hud.WorldText(B.Pos + Vector3.up * 6f, "タックル！！", ec, 1.4f);
+                    Sfx.Play("explode", 1f, 0.8f);
+                    Finale(400, Elem.Pyro);
+                    return false;
+                }
+                return true;
             });
         }
 
-        // やましょう「絶対零度」：ボスを氷づけにして、砕く
+        // やましょう「留年ショット」：留年したので、極太の矢を2本同時に撃つ
         public static void YamashouBurst(Player p)
         {
             var ec = p.Def.ElemColor;
-            if (B.Alive) B.Freeze(2.4f);
-            Sfx.Play("freeze", 1f);
-            for (int i = 0; i < 16; i++)
+            G.Hud.WorldText(p.Pos + Vector3.up * 3f, "留年！！", Mat.Gold, 1.3f);
+            Sfx.Play("arrow", 1f, 0.6f);
+            Sfx.Play("whoosh", 1f, 0.5f);
+            G.Cam.FovPunch(-6);
+            for (int k = 0; k < 2; k++)
             {
-                int k = i;
-                Fx.Later(0.1f + k * 0.1f, () =>
+                float off = k == 0 ? -0.08f : 0.08f;
+                var start = p.HandPos + Vector3.up * 0.2f + new Vector3(Mathf.Cos(p.Face), 0, -Mathf.Sin(p.Face)) * (k == 0 ? -0.5f : 0.5f);
+                Shoot(start, p.Face + off, ec, 3.2f, 30f, hp =>
                 {
-                    if (!B.Alive || G.State != Game.Mode.Battle) return;
-                    float a = Random.value * Mathf.PI * 2;
-                    Fx.IceSpike(B.Pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * Random.Range(1.5f, 3.5f), Random.Range(2f, 4f));
-                    Sfx.Play("ice", 0.5f, 1.1f);
-                    G.DamageBoss(55, Game.HitKind.Burst, B.Pos + Vector3.up * 2.5f + Random.insideUnitSphere, k == 0 ? Elem.Cryo : Elem.None, true);
+                    Fx.Explosion(hp, ec, 1.8f);
+                    Fx.Ring(B.Pos, 9, ec, 0.5f, 3f);
+                    Fx.Sparks(hp, Color.white, 30, 1.8f);
+                    Sfx.Play("burstHit", 0.8f, 1.1f);
+                    G.Cam.Shake(0.6f);
+                    G.DamageBoss(330, Game.HitKind.Burst, hp, Elem.Wind);
                 });
             }
-            Fx.Later(2.0f, () =>
+            // 矢の後に吹く突風（小さい追加ダメージ）
+            for (int i = 0; i < 8; i++)
+            {
+                int k = i;
+                Fx.Later(0.5f + k * 0.08f, () =>
+                {
+                    if (!B.Alive || G.State != Game.Mode.Battle) return;
+                    Fx.SlashLine(B.Pos + Vector3.up * 2.4f, ec, 6f);
+                    G.DamageBoss(35, Game.HitKind.Burst, B.Pos + Vector3.up * 2.4f + Random.insideUnitSphere, Elem.None, true);
+                });
+            }
+            Fx.Later(1.3f, () =>
             {
                 if (!B.Alive || G.State != Game.Mode.Battle) return;
-                B.Freeze(0);
-                Fx.Debris(B.Pos + Vector3.up * 2, new Color(0.85f, 0.95f, 1f), 60);
-                Fx.Sparks(B.Pos + Vector3.up * 2, ec, 50, 2f);
-                Fx.Ring(B.Pos, 12, ec, 0.6f, 3f);
-                G.Hud.WorldText(B.Pos + Vector3.up * 6f, "粉砕！！", ec, 1.4f);
-                Sfx.Play("break", 1f);
-                Finale(560, Elem.Cryo);
+                G.Hud.WorldText(B.Pos + Vector3.up * 6f, "もう1年！！", Mat.Gold, 1.2f);
+                Finale(180, Elem.Wind);
             });
         }
 

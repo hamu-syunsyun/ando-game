@@ -368,7 +368,7 @@ namespace AndoBoss
             Ring(new Vector3(p.x, 0, p.z), 3 * size, c, 0.35f);
         }
 
-        // 斬撃の線（ともきの元素爆発）。中心を通るランダムな向きの光の線
+        // 斬撃の線（ともきの奥義）。中心を通るランダムな向きの光の線
         public static void SlashLine(Vector3 center, Color c, float len)
         {
             if (!I) return;
@@ -438,7 +438,7 @@ namespace AndoBoss
             I.jobs.Clear(); I.adding.Clear(); I.timers.Clear();
             foreach (var ps in new[] { I.sparks, I.glow, I.debris, I.confetti, I.stars, I.embers }) ps.Clear();
             foreach (var t in GameObject.FindObjectsByType<Transform>(FindObjectsSortMode.None))
-                if (t && t.parent == null && (t.name == "tele" || t.name == "teleband" || t.name == "bullet" || t.name == "orb" || t.name == "beam")) Kill(t.gameObject);
+                if (t && t.parent == null && (t.name == "tele" || t.name == "teleband" || t.name == "bullet" || t.name == "orb" || t.name == "beam" || t.name == "arrow" || t.name == "rugby" || t.name == "report")) Kill(t.gameObject);
             I.hitStop = 0; I.slowT = 0; I.slowScale = 1;
         }
 

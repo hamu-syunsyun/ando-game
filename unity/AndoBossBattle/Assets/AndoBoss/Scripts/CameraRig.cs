@@ -12,7 +12,7 @@ namespace AndoBoss
         float shake, fovPunch;
         const float BaseFov = 55;
 
-        // 演出用のカメラ（元素爆発・撃破・タイトル）
+        // 演出用のカメラ（奥義・撃破・タイトル）
         bool cine; Vector3 cinePos, cineLook; float cineFov = 50, cineBlend;
         Vector3 smoothTarget;
 

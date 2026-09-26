@@ -8,9 +8,9 @@ namespace AndoBoss
     // ボス：電気回路担当・安東先生（架空の人物）
     public class Boss : MonoBehaviour
     {
-        public const float MaxHp = 9000f;
+        public const float MaxHp = 16000f;
         public const float Radius = 1.7f;
-        public const float MaxTough = 1500f;
+        public const float MaxTough = 4200f;
 
         public Vector3 Pos;
         public float Y, Face, Hp, LagHp, Tough, BreakT, Flash, SinkT, FreezeT;
@@ -145,7 +145,7 @@ namespace AndoBoss
             }
             dizzy.SetActive(false);
 
-            // 絶対零度の氷づけ
+            // 氷づけ（今は使っていないが、演出用に残してある）
             iceBlock = new GameObject("ice");
             iceBlock.transform.SetParent(transform, false);
             var iceM = Mat.Fx(new Color(0.6f, 0.9f, 1f, 0.35f), Mat.White, false, 1f);
@@ -281,7 +281,7 @@ namespace AndoBoss
                 if (!atk(dt))
                 {
                     atk = null; Pose = "idle"; lockFace = false;
-                    restT = Phase == 2 ? Random.Range(0.6f, 1.1f) : Random.Range(1.2f, 2f);
+                    restT = Phase == 2 ? Random.Range(0.45f, 0.85f) : Random.Range(0.8f, 1.4f);
                 }
                 Animate(dt);
                 return;
@@ -375,7 +375,7 @@ namespace AndoBoss
                     Sfx.Play("thunder", 0.7f, 1, 0.15f);
                     var pp = Game.I.Player.Pos;
                     float dd = Player.Flat(pp - pos).magnitude;
-                    if (dd < 2.3f && pp.y < 3) Game.I.Player.TakeHit(170);
+                    if (dd < 2.3f && pp.y < 3) Game.I.Player.TakeHit(170, pos);
                     if (dd < 9) Game.I.Cam.Shake(0.18f);
                 });
             }
@@ -449,7 +449,7 @@ namespace AndoBoss
             {
                 var P = Game.I.Player;
                 float d = Player.Flat(P.Pos - center).magnitude;
-                if (!hit && Mathf.Abs(d - r) < 0.6f && P.Pos.y < 0.55f) hit = P.TakeHit(190);
+                if (!hit && Mathf.Abs(d - r) < 0.6f && P.Pos.y < 0.55f) hit = P.TakeHit(190, center);
                 return Alive;
             });
         }
@@ -491,7 +491,7 @@ namespace AndoBoss
                     Fx.Debris(Pos + Vector3.up * 0.3f, new Color(0.8f, 0.75f, 0.64f), 14);
                     Fx.Ring(Pos, 4.2f, Color.white, 0.25f);
                     var pp = Game.I.Player.Pos;
-                    if (Player.Flat(pp - Pos).magnitude < 3.8f && pp.y < 1.5f) Game.I.Player.TakeHit(150);
+                    if (Player.Flat(pp - Pos).magnitude < 3.8f && pp.y < 1.5f) Game.I.Player.TakeHit(150, Pos);
                     done++; t = 0;
                     if (done >= hops) { lockFace = false; return false; }
                     NextHop();
@@ -539,7 +539,7 @@ namespace AndoBoss
                         Sfx.Play("trans", 0.8f);
                         Fx.Debris(target + Vector3.up * 0.3f, new Color(0.8f, 0.75f, 0.64f), 10);
                         var pp = Game.I.Player.Pos;
-                        if (Player.Flat(pp - target).magnitude < 3.2f && pp.y < 1.5f && Game.I.Player.TakeHit(90)) Game.I.ApplySlow(5f);
+                        if (Player.Flat(pp - target).magnitude < 3.2f && pp.y < 1.5f && Game.I.Player.TakeHit(90, target)) Game.I.ApplySlow(5f);
                     }
                     return true;
                 }
@@ -559,7 +559,7 @@ namespace AndoBoss
                         ringM.SetColor("_Color", new Color(0.4f, 1f, 0.6f, Mathf.Clamp01(1 - r / 7)));
                         var pp = Game.I.Player.Pos;
                         float d = Player.Flat(pp - target).magnitude;
-                        if (!hit && Mathf.Abs(d - r) < 0.7f && pp.y < 0.8f) { hit = true; if (Game.I.Player.TakeHit(80)) Game.I.ApplySlow(5f); }
+                        if (!hit && Mathf.Abs(d - r) < 0.7f && pp.y < 0.8f) { hit = true; if (Game.I.Player.TakeHit(80, target)) Game.I.ApplySlow(5f); }
                         return r < 7;
                     }, ring);
                 }
@@ -637,7 +637,7 @@ namespace AndoBoss
                 var P = Game.I.Player;
                 if (new Vector2(p.x - P.Pos.x, p.z - P.Pos.z).magnitude < 0.6f && P.Pos.y < 1.6f)
                 {
-                    if (P.TakeHit(110)) { Fx.Sparks(p, c, 8, 0.8f); return false; }
+                    if (P.TakeHit(110, p - fwd)) { Fx.Sparks(p, c, 8, 0.8f); return false; }
                 }
                 return s < 34 && Alive;
             }, g);
@@ -699,7 +699,7 @@ namespace AndoBoss
                 var rel = Player.Flat(pp - origin);
                 float along = Vector3.Dot(rel, dir);
                 float side = (rel - dir * along).magnitude;
-                if (along > 0 && along < len && side < 1.0f && pp.y < 1.3f) Game.I.Player.TakeHit(150);
+                if (along > 0 && along < len && side < 1.0f && pp.y < 1.3f) Game.I.Player.TakeHit(150, origin + dir * along);
                 // 地面を焦がす火花
                 var end = origin + dir * Mathf.Min(len, World.ArenaR * 2);
                 if (Random.value < 0.7f) Fx.Sparks(origin + dir * Random.Range(2f, 20f) + Vector3.down, new Color(1f, 0.5f, 0.6f), 2, 0.6f);
@@ -786,7 +786,7 @@ namespace AndoBoss
                 var p = g.transform.position;
                 if (new Vector2(p.x - P.Pos.x, p.z - P.Pos.z).magnitude < 0.8f && Mathf.Abs(P.Pos.y + 1 - p.y) < 1.1f)
                 {
-                    if (P.TakeHit(110)) { Fx.Sparks(p, Mat.Danger, 10, 0.8f); return false; }
+                    if (P.TakeHit(110, p - v.normalized)) { Fx.Sparks(p, Mat.Danger, 10, 0.8f); return false; }
                 }
                 return t < 3.5f && Alive;
             }, g);

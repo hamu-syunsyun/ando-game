@@ -24,6 +24,9 @@ namespace AndoBoss
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
         // パーティ共通のHP・スタミナ・デバフ
         public float PartyHp = Player.MaxHp, PartyStam = 100, StamDelay, SlowT;
+        // 難しさの調整：ボスの攻撃の強さ・こちらの攻撃の強さ
+        public float EnemyDmgMul = 1.4f;
+        public const float PlayerDmgMul = 0.85f;
         float comboT, stateT, titleOrbit, swapCd;
         bool paused;
         public bool Cinematic;
@@ -32,8 +35,8 @@ namespace AndoBoss
         const string BestKey = "ando_boss_best";
 
         // 画風：0 = アニメ調, 1 = リアル調（F3 で切り替え）
-        public static int Style = 1;
-        float realism = 1;
+        public static int Style = 0;
+        float realism = 0;
 
         // どのシーンで再生しても、これが無ければ自動で作る
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -53,7 +56,7 @@ namespace AndoBoss
             foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) if (l.type == LightType.Directional) l.gameObject.SetActive(false);
             foreach (var a in FindObjectsByType<AudioListener>(FindObjectsSortMode.None)) a.enabled = false;
 
-            Style = PlayerPrefs.GetInt("ando_style", 1);
+            Style = PlayerPrefs.GetInt("ando_style2", 0);
             PostFX.Level = PlayerPrefs.GetInt("ando_light", 1);
             realism = Style;
             Shader.SetGlobalFloat("_AndoRealism", realism);
@@ -179,7 +182,7 @@ namespace AndoBoss
             if (GameInput.Down(GameInput.K.Style))
             {
                 Style = 1 - Style;
-                PlayerPrefs.SetInt("ando_style", Style);
+                PlayerPrefs.SetInt("ando_style2", Style);
                 Hud.Toast(Style == 1 ? "画風：リアル調" : "画風：アニメ調");
             }
 
@@ -273,7 +276,7 @@ namespace AndoBoss
             {
                 energyAnnounced = true;
                 Sfx.Play("ready", 0.7f);
-                Hud.Toast($"{Player.Def.Name}の元素爆発 準備完了！　Q で発動");
+                Hud.Toast($"{Player.Def.Name}の奥義 準備完了！　Q で発動");
             }
             if (Player.Energy < 100) energyAnnounced = false;
 
@@ -342,11 +345,11 @@ namespace AndoBoss
         {
             var B = Boss; var P = Player;
             if (State != Mode.Battle || !B.Alive) return;
-            float critRate = P.BuffT > 0 ? 0.7f : 0.22f;
+            float critRate = P.BuffT > 0 ? 0.6f : 0.18f;
             bool crit = Random.value < critRate;
-            float mul = (crit ? 1.8f : 1f) * (B.Broken ? 1.5f : 1f) * (B.FreezeT > 0 ? 1.2f : 1f) * Random.Range(0.9f, 1.1f);
+            float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * Random.Range(0.9f, 1.1f);
 
-            // 元素反応
+            // 属性コンボ
             var react = Elements.React(B.Aura, elem);
             if (react.name != null)
             {
@@ -354,9 +357,9 @@ namespace AndoBoss
                 B.Aura = Elem.None; B.AuraT = 0;
                 Reactions++;
                 Hud.WorldText(hitPos + Vector3.up * 1.2f, react.name, react.color, 1.1f);
-                Sfx.Play(react.name == "過負荷" ? "explode" : react.name == "超電導" ? "ice" : "fire", 0.9f);
-                if (react.name == "過負荷") { Fx.Explosion(hitPos, react.color, 1.5f); Cam.Shake(0.4f); }
-                else if (react.name == "超電導") { Fx.Ring(B.Pos, 6, react.color, 0.4f, 3f); Fx.Sparks(hitPos, react.color, 30, 1.4f); }
+                Sfx.Play(react.name == "過電流" ? "explode" : react.name == "放電嵐" ? "thunder" : "fire", 0.9f);
+                if (react.name == "過電流") { Fx.Explosion(hitPos, react.color, 1.5f); Cam.Shake(0.4f); }
+                else if (react.name == "放電嵐") { Fx.Ring(B.Pos, 6, react.color, 0.4f, 3f); Fx.Sparks(hitPos, react.color, 30, 1.4f); Fx.Bolt(B.Pos, react.color, 0.3f, 10f); }
                 else { Fx.Glow(hitPos, react.color, 2f); Fx.Embers(hitPos, react.color, 20); }
                 PostFX.I?.Chroma(0.15f);
             }
@@ -393,8 +396,8 @@ namespace AndoBoss
 
             if (kind == HitKind.Normal)
             {
-                P.Energy = Mathf.Min(100, P.Energy + 2);
-                if (Random.value < 0.3f) SpawnOrbs(hitPos, 1);
+                P.Energy = Mathf.Min(100, P.Energy + 1);
+                if (Random.value < 0.2f) SpawnOrbs(hitPos, 1);
             }
             if (B.Hp <= 0) Win();
         }
@@ -444,7 +447,7 @@ namespace AndoBoss
 
         public void OnBreak()
         {
-            Hud.Banner("BREAK!!", "理論武装 崩壊！　5秒間ダメージ1.5倍", Mat.Gold, 1.6f);
+            Hud.Banner("BREAK!!", "理論武装 崩壊！　5秒間ダメージ1.3倍", Mat.Gold, 1.6f);
             Sfx.Play("break", 1f);
             Fx.Slow(0.2f, 0.6f);
             PostFX.I?.Radial(0.6f);
@@ -484,7 +487,7 @@ namespace AndoBoss
             PostFX.I?.Radial(0.3f);
         }
 
-        // ---- 元素爆発 ----
+        // ---- 奥義 ----
         public void StartBurst(Player p)
         {
             Cinematic = true;
@@ -519,7 +522,7 @@ namespace AndoBoss
             }
         }
 
-        // ---- 元素エネルギーの玉 ----
+        // ---- やる気の玉 ----
         public void SpawnOrbs(Vector3 from, int n)
         {
             for (int i = 0; i < n; i++)
@@ -534,7 +537,7 @@ namespace AndoBoss
         {
             // 出ているキャラは多め、控えのキャラも少したまる
             for (int i = 0; i < Party.Length; i++)
-                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 6 : 3));
+                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 4 : 2));
             Sfx.Play("orb", 0.5f, 0.9f + Player.Energy / 300f);
             Fx.Sparks(Player.Pos + Vector3.up, Player.Def.ElemColor, 6, 0.5f);
         }
@@ -611,7 +614,7 @@ namespace AndoBoss
                 reactions = Reactions,
             };
             d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus + d.reactions * 20;
-            d.grade = !win ? "不可" : d.total >= 13000 ? "秀" : d.total >= 12000 ? "優" : d.total >= 11000 ? "良" : "可";
+            d.grade = !win ? "不可" : d.total >= 19500 ? "秀" : d.total >= 18700 ? "優" : d.total >= 18000 ? "良" : "可";
             int best = PlayerPrefs.GetInt(BestKey, 0);
             d.record = d.total > best;
             if (d.record) { PlayerPrefs.SetInt(BestKey, d.total); PlayerPrefs.Save(); }
@@ -627,7 +630,7 @@ namespace AndoBoss
         }
     }
 
-    // 敵から出てきて主人公に吸い込まれる元素エネルギーの玉
+    // 敵から出てきて主人公に吸い込まれるやる気の玉
     public class Orb : MonoBehaviour
     {
         Vector3 vel; float t;

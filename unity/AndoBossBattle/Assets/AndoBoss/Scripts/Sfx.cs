@@ -167,6 +167,21 @@ namespace AndoBoss
                 Add("paper", b, 0.75f);
             }
 
+            // 弓（やましょう）：弦のビンッという低い音＋風切り
+            {
+                var b = Buffer(0.4f); var f = new SVF(); double ph = 0;
+                for (int i = 0; i < b.Length; i++)
+                {
+                    float t = i / (float)SR;
+                    ph += (140 + 60 * Math.Exp(-t * 40)) / SR;
+                    f.Run(Saw(ph) + rng.Noise() * 0.3f, 900 * Env(t, 0.001f, 0.05f) + 200, 3);
+                    b[i] = f.Low * Env(t, 0.001f, 0.12f) * 1.5f;
+                }
+                Synth.Add(b, Swish(0.3f, 1400, 500, 2f), (int)(0.02f * SR), 0.6f);
+                Reverb(b, 0.8f, 0.15f);
+                Add("arrow", b, 0.7f);
+            }
+
             // ---- 炎（杉山くん）----
             {
                 var b = Buffer(1.1f);
@@ -254,7 +269,7 @@ namespace AndoBoss
                 Reverb(b, 1f, 0.2f);
                 Add("swap", b, 0.75f);
             }
-            // 元素爆発のため（上昇音）
+            // 奥義のため（上昇音）
             {
                 var b = Buffer(1.25f); var f = new SVF(); double ph = 0, ph2 = 0;
                 for (int i = 0; i < b.Length; i++)
@@ -266,7 +281,7 @@ namespace AndoBoss
                 }
                 Add("charge", b, 0.8f);
             }
-            // 元素爆発の大きい一撃
+            // 奥義の大きい一撃
             {
                 var b = Buffer(2.2f);
                 Synth.Add(b, Get("thunder"), 0, 1f);
@@ -425,9 +440,9 @@ namespace AndoBoss
             }
 
             // ================= UI・演出 =================
-            // 元素エネルギーの玉を拾う：ふわっとした風（小さく）
+            // やる気の玉を拾う：ふわっとした風（小さく）
             Add("orb", Swish(0.25f, 500, 1200, 3f), 0.3f);
-            // 元素爆発の準備完了：あたたかい和音のふくらみ
+            // 奥義の準備完了：あたたかい和音のふくらみ
             {
                 var b = Buffer(1.3f); var f = new SVF();
                 float[] ch = { 50, 57, 62, 64, 69 };

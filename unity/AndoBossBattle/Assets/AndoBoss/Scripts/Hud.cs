@@ -240,7 +240,7 @@ namespace AndoBoss
             stamRing = Img(New(st, "ring", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero), new Color(0.95f, 0.85f, 0.3f), Mat.RingSprite);
             stamRing.type = Image.Type.Filled; stamRing.fillMethod = Image.FillMethod.Radial360; stamRing.fillOrigin = 2; stamRing.fillClockwise = false;
 
-            // 元素スキル E
+            // 特技 E
             var br = new Vector2(1, 0);
             skillRt = New(battle, "skill", br, br, new Vector2(-300, 110), new Vector2(118, 118));
             Img(skillRt, new Color(0.08f, 0.06f, 0.15f, 0.75f), Mat.CircleSprite);
@@ -252,7 +252,7 @@ namespace AndoBoss
             Shadowed(skillCdText, Color.black, 2);
             skillLabel = KeyCap(skillRt, "E", "レポート提出");
 
-            // 元素爆発 Q
+            // 奥義 Q
             burstRt = New(battle, "burst", br, br, new Vector2(-135, 135), new Vector2(160, 160));
             burstGlow = Img(New(burstRt, "glow", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 300)), new Color(0.75f, 0.5f, 1f, 0), Mat.GlowSprite);
             Img(New(burstRt, "bg", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero), new Color(0.08f, 0.06f, 0.15f, 0.8f), Mat.CircleSprite);
@@ -284,11 +284,11 @@ namespace AndoBoss
             Shadowed(subText, new Color(0, 0, 0, 0.8f), 2);
             subGroup.alpha = 0;
 
-            // ボスについている元素
+            // ボスについている属性
             auraDot = Img(New(battle, "aura", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(510, -80), new Vector2(34, 34)), Color.white, Mat.CircleSprite);
             auraText = Label(auraDot.rectTransform, "", uiFont, 20, new Color(0.1f, 0.05f, 0.15f), Vector2.zero, TextAnchor.MiddleCenter, 40);
 
-            hintText = Label(battle, "WASD 移動　クリック/J 攻撃　E スキル　Q 元素爆発　1・2・3 交代　Shift 回避　Space ジャンプ　Tab ロックオン　F2 光　F3 画風　Esc 一時停止",
+            hintText = Label(battle, "WASD 移動　クリック/J 攻撃　E 特技　Q 奥義　1・2・3 交代　Shift 回避　Space ジャンプ　Tab ロックオン　F2 光　F3 画風　Esc 一時停止",
                 uiFont, 18, new Color(1, 1, 1, 0.75f), Vector2.zero, TextAnchor.MiddleLeft, 1400);
             Anchor(hintText.rectTransform, Vector2.zero, new Vector2(730, 24));
             Shadowed(hintText, new Color(0, 0, 0, 0.7f), 1);
@@ -325,7 +325,7 @@ namespace AndoBoss
             Img(New(cutBand, "edge2", Vector2.zero, new Vector2(1, 0), Vector2.zero, new Vector2(0, 8), new Vector2(0.5f, 0)), Mat.ElectroLight);
             for (int i = 0; i < 14; i++)
                 Img(New(cutBand, "speed", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(Random.Range(-1400, 1400), Random.Range(-110, 110)), new Vector2(Random.Range(200, 600), 4)), new Color(1, 1, 1, 0.35f));
-            cutSmall = Label(cutBand, "元素爆発", uiFont, 44, Mat.Gold, new Vector2(-260, 70), TextAnchor.MiddleCenter, 600);
+            cutSmall = Label(cutBand, "奥義", uiFont, 44, Mat.Gold, new Vector2(-260, 70), TextAnchor.MiddleCenter, 600);
             cutBig = Label(cutBand, "V ＝ I R", bigFont, 150, Color.white, new Vector2(80, -20), TextAnchor.MiddleCenter, 1400, 200);
             Shadowed(cutBig, new Color(0.45f, 0.2f, 0.9f), 6);
             cutGroup.alpha = 0;
@@ -370,8 +370,8 @@ namespace AndoBoss
             Label(panel, "操作方法", uiFont, 36, Mat.Gold, new Vector2(0, 260), TextAnchor.MiddleCenter, 500);
             string[,] rows =
             {
-                { "移動", "W A S D" }, { "視点", "マウス" }, { "通常攻撃", "左クリック / J" }, { "元素スキル", "E" },
-                { "元素爆発", "Q（ゲージ満タン）" }, { "キャラ交代", "1 / 2 / 3" }, { "回避", "Shift / 右クリック" }, { "ジャンプ", "Space" },
+                { "移動", "W A S D" }, { "視点", "マウス" }, { "通常攻撃", "左クリック / J" }, { "特技", "E" },
+                { "奥義", "Q（やる気満タン）" }, { "キャラ交代", "1 / 2 / 3" }, { "回避", "Shift / 右クリック" }, { "ジャンプ", "Space" },
                 { "光の強さ・画風", "F2 ・ F3" }, { "一時停止", "Esc" },
             };
             for (int i = 0; i < rows.GetLength(0); i++)
@@ -379,7 +379,7 @@ namespace AndoBoss
                 Label(panel, rows[i, 0], uiFont, 24, Color.white, new Vector2(-40, 205 - i * 42), TextAnchor.MiddleLeft, 400);
                 Label(panel, rows[i, 1], uiFont, 24, Mat.ElectroLight, new Vector2(40, 205 - i * 42), TextAnchor.MiddleRight, 400);
             }
-            Label(panel, "ともき（雷）・杉山くん（炎）・やましょう（氷）\nちがう元素を続けて当てると「元素反応」！", uiFont, 21, new Color(1, 0.9f, 0.6f), new Vector2(0, -255), TextAnchor.MiddleCenter, 540, 70);
+            Label(panel, "ともき（雷）・杉山くん（炎）・やましょう（風）\nちがう属性を続けて当てると「属性コンボ」！", uiFont, 21, new Color(1, 0.9f, 0.6f), new Vector2(0, -255), TextAnchor.MiddleCenter, 540, 70);
             var credit = Label(title, "音楽・効果音・グラフィックはすべてプログラムで生成しています。安東先生は架空の人物です。", uiFont, 20, new Color(1, 1, 1, 0.7f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
             Anchor(credit.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 30));
         }
@@ -469,7 +469,7 @@ namespace AndoBoss
         public void CutIn(CharDef d)
         {
             cutT = 0; cutin.SetAsLastSibling(); letterTarget = 1;
-            cutSmall.text = $"{d.Name}　元素爆発";
+            cutSmall.text = $"{d.Name}　奥義";
             cutBig.text = d.BurstName;
             cutBig.fontSize = d.BurstName.Length > 6 ? 110 : 150;
             cutBand.GetComponent<Image>().color = Color.Lerp(d.ElemColor, Color.black, 0.55f) * new Color(1, 1, 1, 0.88f);
@@ -551,7 +551,7 @@ namespace AndoBoss
                 d.win ? $"残りHPボーナス　　　　+{d.hpBonus}" : "残りHPボーナス　　　　―",
                 $"ジャスト回避 ×{d.perfects}　　 +{d.perfectBonus}",
                 $"最大コンボ {d.maxCombo}　　　　+{d.comboBonus}",
-                $"元素反応 ×{d.reactions}　　　 +{d.reactions * 20}",
+                $"属性コンボ ×{d.reactions}　　　 +{d.reactions * 20}",
             };
             for (int i = 0; i < resRows.Count; i++) { resRows[i].text = rows[i]; resRows[i].color = new Color(1, 1, 1, 0); }
             resTotal.text = "";
@@ -632,7 +632,7 @@ namespace AndoBoss
             }
             else if (cutGroup.alpha > 0) { cutGroup.alpha = 0; if (G.State == Game.Mode.Battle && !G.Cinematic) letterTarget = 0; }
 
-            // 登場演出・元素爆発・決着の演出中はUIを隠して画面を広く見せる
+            // 登場演出・奥義・決着の演出中はUIを隠して画面を広く見せる
             bool hideUi = G.State == Game.Mode.Intro || G.Cinematic;
             battleGroup.alpha = Mathf.MoveTowards(battleGroup.alpha, hideUi ? 0 : 1, dt * 4);
             if (battle.gameObject.activeSelf) UpdateBattle(dt, G);
