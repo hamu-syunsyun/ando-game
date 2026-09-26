@@ -9,7 +9,9 @@ namespace AndoBoss
     {
         Font uiFont, bigFont;
         Canvas canvas;
-        RectTransform root, battle, title, result, intro, pause, cutin;
+        RectTransform root, battle, title, result, intro, pause, cutin, select;
+        readonly List<(RectTransform rt, Image bg, Image border)> selCards = new List<(RectTransform, Image, Image)>();
+        int selIdx; float selT;
 
         // 戦闘UI
         RectTransform bossFill, bossLag, toughFill, playerFill, playerLag;
@@ -87,6 +89,8 @@ namespace AndoBoss
             BuildCutin();
             intro = Full(root, "intro");
             BuildIntro();
+            select = Full(root, "select");
+            BuildSelect();
             title = Full(root, "title");
             BuildTitle();
             result = Full(root, "result");
@@ -414,9 +418,44 @@ namespace AndoBoss
             var so = resStamp.gameObject.AddComponent<Outline>(); so.effectColor = new Color(1, 1, 1, 0.8f); so.effectDistance = new Vector2(2, -2);
         }
 
+        // ---------------- キャラ選択 ----------------
+        void BuildSelect()
+        {
+            var head = Label(select, "最初に使うキャラクターを選んでください", uiFont, 44, Color.white, new Vector2(0, 450), TextAnchor.MiddleCenter, 1600);
+            Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
+            var help = Label(select, "← → か 1・2・3 で選ぶ　／　Enter・クリックで決定　（戦闘中も 1・2・3 で交代できます）", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
+            Shadowed(help, new Color(0, 0, 0, 0.8f), 2);
+            for (int i = 0; i < CharDef.All.Length; i++)
+            {
+                var d = CharDef.All[i];
+                var card = New(select, "card" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 590, -290), new Vector2(560, 380));
+                var border = Img(card, d.ElemColor, Mat.RoundSprite); border.type = Image.Type.Sliced;
+                var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
+                bg.type = Image.Type.Sliced;
+                var nm = Label(card, d.Name, bigFont, 56, Color.white, new Vector2(-40, 140), TextAnchor.MiddleLeft, 480, 80);
+                Shadowed(nm, Color.Lerp(d.ElemColor, Color.black, 0.5f), 3);
+                var dot = Img(New(card, "dot", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(225, 140), new Vector2(56, 56)), d.ElemColor, Mat.CircleSprite);
+                Label(dot.rectTransform, Elements.Kanji(d.Elem), uiFont, 30, new Color(0.1f, 0.05f, 0.15f), Vector2.zero, TextAnchor.MiddleCenter, 60);
+                string weapon = d.Weapon == Weapon.Sword ? "片手剣" : d.Weapon == Weapon.Fist ? "拳" : "弓";
+                Label(card, $"{d.Title}　／　{Elements.Kanji(d.Elem)}・{weapon}", uiFont, 24, d.ElemColor, new Vector2(0, 85), TextAnchor.MiddleCenter, 520);
+                Label(card, $"E 特技：{d.SkillName}", uiFont, 26, Color.white, new Vector2(0, 30), TextAnchor.MiddleLeft, 500);
+                Label(card, $"Q 奥義：{d.BurstName}", uiFont, 26, Color.white, new Vector2(0, -20), TextAnchor.MiddleLeft, 500);
+                var pas = Label(card, d.Passive != "" ? "能力　" + d.Passive : (d.AtkMul > 1 ? "" : ""), uiFont, 21, Mat.Gold, new Vector2(0, -95), TextAnchor.UpperLeft, 500, 90);
+                pas.horizontalOverflow = HorizontalWrapMode.Wrap;
+                selCards.Add((card, bg, border));
+            }
+            select.gameObject.SetActive(false);
+        }
+
+        public void ShowSelect(int idx)
+        {
+            if (!select.gameObject.activeSelf) { ShowOnly(select); selT = 0; }
+            selIdx = idx;
+        }
+
         void ShowOnly(RectTransform which)
         {
-            foreach (var r in new[] { battle, title, result })
+            foreach (var r in new[] { battle, title, result, select })
                 r.gameObject.SetActive(r == which);
         }
 
@@ -498,7 +537,7 @@ namespace AndoBoss
             n.drift = new Vector2(0, 90);
         }
 
-        public enum NumKind { Normal, Crit, Player, Break, Burst, Text }
+        public enum NumKind { Normal, Crit, Player, Break, Burst, Text, Heal }
         int lastNum;
         public void Number(Vector3 world, int value, NumKind kind, Color tint = default)
         {
@@ -524,6 +563,8 @@ namespace AndoBoss
             {
                 case NumKind.Crit:
                     n.t.text = value.ToString(); n.t.fontSize = 76; n.t.color = new Color(1f, 0.86f, 0.3f); ol.effectColor = new Color(0.55f, 0.25f, 0); n.life = 1.1f; n.scale = 1.9f; break;
+                case NumKind.Heal:
+                    n.t.text = "+" + value; n.t.fontSize = 56; n.t.color = new Color(0.45f, 1f, 0.55f); ol.effectColor = new Color(0, 0.25f, 0.05f); n.life = 1.2f; n.scale = 1.5f; break;
                 case NumKind.Player:
                     n.t.text = "-" + value; n.t.fontSize = 48; n.t.color = new Color(1f, 0.35f, 0.35f); ol.effectColor = new Color(0.3f, 0, 0); n.life = 0.9f; n.scale = 1.3f; break;
                 case NumKind.Break:
@@ -636,6 +677,21 @@ namespace AndoBoss
             bool hideUi = G.State == Game.Mode.Intro || G.Cinematic;
             battleGroup.alpha = Mathf.MoveTowards(battleGroup.alpha, hideUi ? 0 : 1, dt * 4);
             if (battle.gameObject.activeSelf) UpdateBattle(dt, G);
+            if (select.gameObject.activeSelf)
+            {
+                selT += dt;
+                for (int i = 0; i < selCards.Count; i++)
+                {
+                    bool on = i == selIdx;
+                    var c = selCards[i];
+                    float target = on ? 1.06f + 0.015f * Mathf.Sin(selT * 5) : 0.94f;
+                    c.rt.localScale = Vector3.one * Mathf.Lerp(c.rt.localScale.x, target, dt * 12);
+                    var ec = CharDef.All[i].ElemColor;
+                    c.border.color = on ? ec : new Color(ec.r, ec.g, ec.b, 0.25f);
+                    c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
+                    c.rt.anchoredPosition = new Vector2((i - 1) * 590, -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - selT * 3) * 300);
+                }
+            }
             // 字幕（登場演出・決着の演出中も出す。結果画面では消す）
             subT -= dt;
             subGroup.alpha = Mathf.MoveTowards(subGroup.alpha, subT > 0 && !result.gameObject.activeSelf && !title.gameObject.activeSelf ? 1 : 0, dt * 5);
@@ -685,9 +741,9 @@ namespace AndoBoss
             var sp = cam.WorldToScreenPoint(P.Pos + Vector3.up * 1.8f);
             var stRt = stamRing.transform.parent as RectTransform;
             stRt.position = new Vector3(sp.x + 70 * canvas.scaleFactor, sp.y, 0);
-            stamRing.fillAmount = P.Stam / 100f;
+            stamRing.fillAmount = P.Stam / Game.MaxStam;
             stamRing.color = P.Stam < 25 ? new Color(1, 0.35f, 0.3f) : new Color(0.95f, 0.85f, 0.3f);
-            stamGroup.alpha = Mathf.MoveTowards(stamGroup.alpha, P.Stam < 99.5f && sp.z > 0 ? 1 : 0, dt * 4);
+            stamGroup.alpha = Mathf.MoveTowards(stamGroup.alpha, P.Stam < Game.MaxStam - 0.5f && sp.z > 0 ? 1 : 0, dt * 4);
 
             // スキル
             var ec = P.Def.ElemColor;
@@ -713,6 +769,7 @@ namespace AndoBoss
                 r.rt.anchoredPosition = new Vector2(on ? -170 - swapFlash * 20 : -150, -20 - i * 70);
                 r.rt.localScale = Vector3.one * (on ? 1.08f : 0.95f);
                 r.name.color = on ? Color.white : new Color(1, 1, 1, 0.6f);
+                r.name.text = pm.Def.Passive != "" && !G.ReviveUsed ? pm.Def.Name + " <size=18><color=#ffd54d>留年×1</color></size>" : pm.Def.Name;
                 bool rdy = pm.Energy >= 100;
                 r.ready.color = new Color(pm.Def.ElemColor.r, pm.Def.ElemColor.g, pm.Def.ElemColor.b, rdy ? 0.6f + 0.3f * Mathf.Sin(Time.unscaledTime * 6) : 0);
             }

@@ -182,6 +182,25 @@ namespace AndoBoss
                 Add("arrow", b, 0.7f);
             }
 
+            // エナジードリンク：缶を開ける「プシュッ」＋ごくごく
+            {
+                var b = Buffer(1.0f); var hp = new SVF(); var lp = new SVF();
+                for (int i = 0; i < b.Length; i++)
+                {
+                    float t = i / (float)SR;
+                    float n = rng.Noise();
+                    hp.Run(n, 2500, 0.7f);
+                    b[i] = hp.Band * Env(t, 0.002f, 0.08f) * 0.8f;
+                    for (int g = 0; g < 3; g++)
+                    {
+                        float gt = t - 0.3f - g * 0.2f;
+                        if (gt > 0 && gt < 0.15f) b[i] += Sin(gt * Mathf.Lerp(180, 110, gt / 0.15f)) * Env(gt, 0.01f, 0.05f) * 0.9f;
+                    }
+                    lp.Run(b[i], 3000, 0.8f); b[i] = lp.Low;
+                }
+                Add("drink", b, 0.7f);
+            }
+
             // ---- 炎（杉山くん）----
             {
                 var b = Buffer(1.1f);

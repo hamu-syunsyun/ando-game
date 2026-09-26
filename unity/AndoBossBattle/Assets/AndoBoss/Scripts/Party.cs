@@ -20,6 +20,7 @@ namespace AndoBoss
         public string SkillName, BurstName, BurstShout;
         public Color Hair, Jacket, Pants, Accent, Eye, Skin;
         public bool Glasses, Spiky, Sleepy;
+        public string Passive = "";
 
         public Color ElemColor => Elements.Color(Elem);
 
@@ -45,7 +46,8 @@ namespace AndoBoss
             {
                 Id = 2, Name = "やましょう", Title = "最強の弓使い（ねむい）", Elem = Elem.Wind, Weapon = Weapon.Bow, AtkMul = 1.25f, Height = 1.04f,
                 SwingDmg = new[] { 38f, 38, 45, 90 }, SwingDur = new[] { 0.34f, 0.34f, 0.36f, 0.55f },
-                SkillCd = 9f, SkillName = "二度寝アロー", BurstName = "留年ショット", BurstShout = "……留年したから、2本撃てる。",
+                SkillCd = 9f, SkillName = "二度寝アロー", BurstName = "寝ぼけ乱れ撃ち", BurstShout = "ねみぃ……全部撃っとくか。",
+                Passive = "留年：1回やられても生き返り、極太の矢を2本撃ち返す（1戦に1回）",
                 Hair = new Color(0.25f, 0.35f, 0.3f), Jacket = new Color(0.3f, 0.5f, 0.42f), Pants = new Color(0.2f, 0.22f, 0.26f),
                 Accent = new Color(0.55f, 1f, 0.75f), Eye = new Color(0.3f, 0.75f, 0.55f), Skin = new Color(0.98f, 0.88f, 0.8f), Glasses = true, Sleepy = true,
             },

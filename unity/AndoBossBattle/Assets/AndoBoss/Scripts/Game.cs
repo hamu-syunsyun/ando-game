@@ -6,7 +6,7 @@ namespace AndoBoss
     public class Game : MonoBehaviour
     {
         public static Game I;
-        public enum Mode { Title, Intro, Battle, Ending, Result }
+        public enum Mode { Title, Select, Intro, Battle, Ending, Result }
         public enum HitKind { Normal, Skill, Burst }
 
         public Mode State { get; private set; }
@@ -23,7 +23,11 @@ namespace AndoBoss
         public float TimeLeft;
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
         // パーティ共通のHP・スタミナ・デバフ
-        public float PartyHp = Player.MaxHp, PartyStam = 100, StamDelay, SlowT;
+        public const float MaxStam = 150f;
+        public float PartyHp = Player.MaxHp, PartyStam = MaxStam, StamDelay, SlowT;
+        public int StartChar;
+        public bool ReviveUsed;
+        float drinkT;
         // 難しさの調整：ボスの攻撃の強さ・こちらの攻撃の強さ
         public float EnemyDmgMul = 1.4f;
         public const float PlayerDmgMul = 0.85f;
@@ -95,10 +99,11 @@ namespace AndoBoss
         {
             Fx.ClearAll();
             foreach (var o in FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
-            PartyHp = Player.MaxHp; PartyStam = 100; StamDelay = 0; SlowT = 0;
+            PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(15f, 22f);
+            foreach (var d in FindObjectsByType<Drink>(FindObjectsSortMode.None)) Destroy(d.gameObject);
             foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
-            active = 0;
-            Party[0].gameObject.SetActive(true);
+            active = StartChar;
+            Party[active].gameObject.SetActive(true);
             swapCd = 0;
             Boss.ResetState();
             TimeLeft = TimeLimit;
@@ -120,6 +125,47 @@ namespace AndoBoss
             Music.SetTitle();
             Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
             Boss.Face = Mathf.PI;
+        }
+
+        // ---- キャラ選択 ----
+        void GoSelect()
+        {
+            State = Mode.Select; stateT = 0;
+            Sfx.Play("confirm", 0.8f);
+            for (int i = 0; i < Party.Length; i++)
+            {
+                var p = Party[i];
+                p.gameObject.SetActive(true);
+                p.ResetState();
+                p.Pos = new Vector3((i - 1) * 2.4f, 0, -9);
+                p.Face = Mathf.PI;
+            }
+            Hud.ShowSelect(StartChar);
+        }
+
+        void UpdateSelect()
+        {
+            int before = StartChar;
+            if (GameInput.Down(GameInput.K.Left)) StartChar = (StartChar + Party.Length - 1) % Party.Length;
+            if (GameInput.Down(GameInput.K.Right)) StartChar = (StartChar + 1) % Party.Length;
+            for (int i = 0; i < Party.Length; i++) if (GameInput.Down(GameInput.K.Char1 + i)) StartChar = i;
+            if (before != StartChar)
+            {
+                Sfx.Play("swap", 0.6f, 1.2f);
+                Party[StartChar].SwapInT = 0.35f;
+                Hud.ShowSelect(StartChar);
+            }
+            var sel = Party[StartChar];
+            Cam.Cinematic(sel.Pos + new Vector3(0.8f, 1.9f, -4.2f), sel.Pos + Vector3.up * 1.3f, 40, stateT < 0.05f);
+            for (int i = 0; i < Party.Length; i++)
+            {
+                var p = Party[i];
+                p.Face = Player.TurnTo(p.Face, i == StartChar ? Mathf.PI + 0.15f : Mathf.PI, Time.deltaTime * 6);
+                p.Tick(Time.deltaTime);
+            }
+            Boss.Tick(Time.deltaTime);
+            if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoIntro();
+            if (GameInput.Down(GameInput.K.Title)) GoTitle();
         }
 
         void GoIntro()
@@ -197,6 +243,7 @@ namespace AndoBoss
             switch (State)
             {
                 case Mode.Title: UpdateTitle(); break;
+                case Mode.Select: UpdateSelect(); break;
                 case Mode.Intro: UpdateIntro(); break;
                 case Mode.Battle: UpdateBattle(dt); break;
                 case Mode.Ending: UpdateEnding(dt); break;
@@ -217,7 +264,7 @@ namespace AndoBoss
 
         void TickParty(float dt)
         {
-            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(100, PartyStam + dt * 32);
+            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(MaxStam, PartyStam + dt * 40);
             SlowT = Mathf.Max(0, SlowT - dt);
             for (int i = 0; i < Party.Length; i++)
             {
@@ -233,7 +280,7 @@ namespace AndoBoss
             Cam.Cinematic(c, Boss.Pos + Vector3.up * 3.2f + new Vector3(Mathf.Cos(titleOrbit), 0, -Mathf.Sin(titleOrbit)) * 4, 50, stateT < 0.1f);
             TickParty(Time.deltaTime);
             Boss.Tick(Time.deltaTime);
-            if (stateT > 0.5f && GameInput.Down(GameInput.K.Confirm)) GoIntro();
+            if (stateT > 0.5f && GameInput.Down(GameInput.K.Confirm)) GoSelect();
         }
 
         void UpdateIntro()
@@ -279,6 +326,14 @@ namespace AndoBoss
                 Hud.Toast($"{Player.Def.Name}の奥義 準備完了！　Q で発動");
             }
             if (Player.Energy < 100) energyAnnounced = false;
+
+            // エナジードリンクがときどき空から落ちてくる
+            drinkT -= dt;
+            if (drinkT <= 0)
+            {
+                drinkT = Random.Range(18f, 26f);
+                if (FindObjectsByType<Drink>(FindObjectsSortMode.None).Length < 2) Drink.Spawn();
+            }
 
             if (TimeLeft <= 0 && State == Mode.Battle) Lose("時間切れ…");
         }
@@ -592,7 +647,45 @@ namespace AndoBoss
             Music.StopAll();
         }
 
-        public void OnPlayerDown() => Lose("力尽きた…");
+        // やられたとき。やましょうのパッシブ「留年」が残っていれば1回だけ生き返る
+        public void OnPlayerDown()
+        {
+            if (!ReviveUsed) { Revive(); return; }
+            Lose("力尽きた…");
+        }
+
+        void Revive()
+        {
+            ReviveUsed = true;
+            var from = Player;
+            const int yama = 2;
+            foreach (var p in Party) { p.Dead = false; p.DeadT = 0; }
+            PartyHp = Player.MaxHp * 0.5f;
+            if (active != yama)
+            {
+                from.gameObject.SetActive(false);
+                active = yama;
+                Party[yama].gameObject.SetActive(true);
+                Party[yama].EnterField(new Vector3(from.Pos.x, 0, from.Pos.z), from.Face);
+                Hud.OnSwap(Party[yama].Def);
+            }
+            var y = Player;
+            y.Inv = 3f;
+            y.LockT = 0.8f;
+            Hud.Banner("留年！", "やましょうの能力：1回だけ生き返る（もう1年がんばる）", Mat.Gold, 2f);
+            Say("……留年したから、もう1年いける。", 2.2f, y.Def.Name);
+            Fx.Slow(0.25f, 1.2f);
+            PostFX.I?.Flash(new Color(0.7f, 1f, 0.8f), 0.6f, 2f);
+            PostFX.I?.Radial(0.6f);
+            Fx.Ring(y.Pos, 8, y.Def.ElemColor, 0.8f, 3f);
+            Fx.Stars(y.Pos + Vector3.up, Mat.Gold, 20);
+            Fx.Sparks(y.Pos + Vector3.up, y.Def.ElemColor, 40, 1.5f);
+            Sfx.Play("perfect", 1f);
+            Sfx.Play("ready", 0.8f);
+            Cam.Shake(0.5f);
+            // 生き返った勢いで、極太の矢を2本撃ち返す
+            Fx.Later(0.9f, () => { if (State == Mode.Battle) Skills.RyunenShot(Player); });
+        }
 
         void ShowResult()
         {
@@ -627,6 +720,77 @@ namespace AndoBoss
         void OnApplicationFocus(bool focus)
         {
             if (!focus && State == Mode.Battle && !paused) SetPause(true);
+        }
+    }
+
+    // 空から落ちてくるエナジードリンク。拾うと体力回復
+    public class Drink : MonoBehaviour
+    {
+        public const float Heal = 250f;
+        float t, y = 14;
+        Vector3 pos;
+        Transform can;
+        GameObject marker;
+
+        public static void Spawn()
+        {
+            var G = Game.I;
+            Vector3 p = Vector3.zero;
+            for (int tries = 0; tries < 20; tries++)
+            {
+                float a = Random.value * Mathf.PI * 2, r = Random.Range(3f, World.ArenaR - 3);
+                p = new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+                if (Player.Flat(p - G.Boss.Pos).magnitude > 5) break;
+            }
+            var go = new GameObject("drink");
+            go.AddComponent<Drink>().Init(p);
+            Sfx.Play("whoosh", 0.5f, 0.6f);
+            G.Hud.Toast("エナジードリンクが落ちてきた！（拾うと回復）");
+        }
+
+        void Init(Vector3 p)
+        {
+            pos = p;
+            can = new GameObject("can").transform;
+            can.SetParent(transform, false);
+            // 缶：本体・上下のふち・ラベルの帯・光
+            Mat.Part(can, Mat.Frustum(0.28f, 0.28f, 0.8f, 16), Mat.ToonShared(new Color(0.15f, 0.2f, 0.25f), 0.02f), Vector3.zero, Vector3.one);
+            Mat.Part(can, Mat.Frustum(0.285f, 0.285f, 0.3f, 16), Mat.ToonShared(new Color(0.3f, 1f, 0.4f), 0.02f), Vector3.zero, Vector3.one);
+            Mat.Part(can, Mat.Frustum(0.25f, 0.22f, 0.08f, 16), Mat.ToonShared(new Color(0.8f, 0.82f, 0.85f)), new Vector3(0, 0.44f, 0), Vector3.one);
+            Mat.Part(can, Mat.Frustum(0.22f, 0.25f, 0.08f, 16), Mat.ToonShared(new Color(0.8f, 0.82f, 0.85f)), new Vector3(0, -0.44f, 0), Vector3.one);
+            var glow = Mat.Part(can, Mat.Quad, Mat.FxShared(new Color(0.4f, 1f, 0.5f, 0.6f), Mat.Glow, true, 2f), Vector3.zero, Vector3.one * 2.2f, default, false);
+            glow.AddComponent<Billboard>();
+            marker = Mat.Part(transform, Mat.Disc(32), Mat.FxShared(new Color(0.4f, 1f, 0.5f, 0.6f), Mat.RingTex, true, 2f), new Vector3(p.x, 0.06f, p.z), Vector3.one * 1.6f, default, false);
+            transform.position = Vector3.zero;
+            can.position = new Vector3(p.x, y, p.z);
+        }
+
+        void Update()
+        {
+            var G = Game.I;
+            if (G == null || G.State != Game.Mode.Battle) { if (G != null && G.State != Game.Mode.Ending) Destroy(gameObject); return; }
+            float dt = Time.deltaTime;
+            t += dt;
+            if (y > 0.7f) y = Mathf.Max(0.7f, y - dt * 12);
+            float bob = y <= 0.7f ? Mathf.Sin(t * 3) * 0.15f : 0;
+            can.position = new Vector3(pos.x, y + bob, pos.z);
+            can.rotation = Quaternion.Euler(0, t * 120, y > 0.7f ? t * 400 : 0);
+            marker.transform.localScale = Vector3.one * (1.6f + Mathf.Sin(t * 4) * 0.15f);
+            var P = G.Player;
+            if (y <= 0.8f && Player.Flat(P.Pos - pos).magnitude < 1.4f && P.Pos.y < 1.5f && !P.Dead)
+            {
+                float before = G.PartyHp;
+                G.PartyHp = Mathf.Min(Player.MaxHp, G.PartyHp + Heal);
+                int healed = Mathf.RoundToInt(G.PartyHp - before);
+                G.Hud.Number(P.Pos + Vector3.up * 2.2f, healed, Hud.NumKind.Heal, new Color(0.4f, 1f, 0.5f));
+                G.Hud.Toast("エナドリで回復！　元気100倍");
+                Sfx.Play("drink", 0.9f);
+                Fx.Sparks(P.Pos + Vector3.up, new Color(0.4f, 1f, 0.5f), 20, 1f);
+                Fx.Ring(P.Pos, 3f, new Color(0.4f, 1f, 0.5f), 0.4f);
+                Destroy(gameObject);
+                return;
+            }
+            if (t > 14f) Destroy(gameObject);
         }
     }
 

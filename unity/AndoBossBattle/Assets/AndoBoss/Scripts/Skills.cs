@@ -317,8 +317,8 @@ namespace AndoBoss
             });
         }
 
-        // やましょう「留年ショット」：留年したので、極太の矢を2本同時に撃つ
-        public static void YamashouBurst(Player p)
+        // やましょうの能力「留年」：生き返ったときに、極太の矢を2本同時に撃ち返す
+        public static void RyunenShot(Player p)
         {
             var ec = p.Def.ElemColor;
             G.Hud.WorldText(p.Pos + Vector3.up * 3f, "留年！！", Mat.Gold, 1.3f);
@@ -355,6 +355,37 @@ namespace AndoBoss
                 if (!B.Alive || G.State != Game.Mode.Battle) return;
                 G.Hud.WorldText(B.Pos + Vector3.up * 6f, "もう1年！！", Mat.Gold, 1.2f);
                 Finale(180, Elem.Wind);
+            });
+        }
+
+        // やましょう「寝ぼけ乱れ撃ち」：寝ぼけたまま矢をあちこちに連射する（だいたい当たる）
+        public static void YamashouBurst(Player p)
+        {
+            var ec = p.Def.ElemColor;
+            G.Hud.WorldText(p.Pos + Vector3.up * 3f, "zzz……", new Color(0.8f, 1f, 0.9f), 1.1f);
+            p.LockT = 1.9f;
+            for (int i = 0; i < 22; i++)
+            {
+                int k = i;
+                Fx.Later(0.05f + k * 0.075f, () =>
+                {
+                    if (G.State != Game.Mode.Battle) return;
+                    if (B.Alive) p.Face = Mathf.Atan2(B.Pos.x - p.Pos.x, B.Pos.z - p.Pos.z);
+                    Sfx.Play("arrow", 0.5f, 1.1f + Random.Range(-0.1f, 0.1f));
+                    if (k % 5 == 0) G.Hud.WorldText(p.Pos + Vector3.up * 2.4f, "ねみー", new Color(0.8f, 1f, 0.9f), 0.6f);
+                    Shoot(p.HandPos + Vector3.up * 0.1f, p.Face + Random.Range(-0.35f, 0.35f), ec, 1.2f, 40f, hp =>
+                    {
+                        G.DamageBoss(38, Game.HitKind.Burst, hp, k == 0 || k == 11 ? Elem.Wind : Elem.None, true);
+                    });
+                });
+            }
+            Fx.Later(1.8f, () =>
+            {
+                p.LockT = 0;
+                if (!B.Alive || G.State != Game.Mode.Battle) return;
+                G.Hud.WorldText(B.Pos + Vector3.up * 6f, "ねみぃぃぃ！！", ec, 1.3f);
+                Fx.Ring(B.Pos, 10, ec, 0.6f, 3f);
+                Finale(300, Elem.Wind);
             });
         }
 

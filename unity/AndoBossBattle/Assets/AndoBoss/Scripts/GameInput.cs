@@ -46,6 +46,8 @@ namespace AndoBoss
             switch (k)
             {
                 case K.Attack: return AnyDown(Key.J) || (M != null && M.leftButton.wasPressedThisFrame);
+                case K.Left: return AnyDown(Key.A, Key.LeftArrow);
+                case K.Right: return AnyDown(Key.D, Key.RightArrow);
                 case K.Skill: return AnyDown(Key.E);
                 case K.Burst: return AnyDown(Key.Q);
                 case K.Dodge: return AnyDown(Key.LeftShift, Key.RightShift, Key.K) || (M != null && M.rightButton.wasPressedThisFrame);
@@ -100,6 +102,8 @@ namespace AndoBoss
             switch (k)
             {
                 case K.Attack: return AnyDown(KeyCode.J) || Input.GetMouseButtonDown(0);
+                case K.Left: return AnyDown(KeyCode.A, KeyCode.LeftArrow);
+                case K.Right: return AnyDown(KeyCode.D, KeyCode.RightArrow);
                 case K.Skill: return AnyDown(KeyCode.E);
                 case K.Burst: return AnyDown(KeyCode.Q);
                 case K.Dodge: return AnyDown(KeyCode.LeftShift, KeyCode.RightShift, KeyCode.K) || Input.GetMouseButtonDown(1);
