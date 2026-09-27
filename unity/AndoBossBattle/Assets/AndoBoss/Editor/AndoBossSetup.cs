@@ -36,9 +36,17 @@ namespace AndoBoss.EditorTools
             }
         }
 
+        // シーンが無ければ作る（ビルド前に呼ぶ）
+        public static void EnsureScene()
+        {
+            if (!File.Exists(ScenePath)) CreateScene(false);
+            EnsureBuildSettings();
+            ApplyPlayerSettings();
+        }
+
         static void CreateScene(bool open)
         {
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var go = new GameObject("AndoBossGame");
