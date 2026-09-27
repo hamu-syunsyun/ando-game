@@ -33,6 +33,9 @@ namespace AndoBoss.EditorTools
         static BuildReport Build()
         {
             AndoBossSetup.EnsureScene();
+            // 使っていないライブラリのコードを削って、配りやすい大きさにする
+            PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedStrippingLevel.Medium);
+            PlayerSettings.usePlayerLog = true;
             Directory.CreateDirectory(OutDir);
             var opts = new BuildPlayerOptions
             {
