@@ -278,8 +278,11 @@ namespace AndoBoss
             bool fin = sw.idx == LastIdx;
             float d = Flat(B.Pos - Pos).magnitude;
             float dir = Mathf.Atan2(B.Pos.x - Pos.x, B.Pos.z - Pos.z);
-            bool inArc = AngDiff(Face, dir) < (fin && Def.Weapon != Weapon.Fist ? Mathf.PI : 1.5f);
-            float reach = Boss.Radius + (fin ? 3.2f : 2.5f) - (Def.Weapon == Weapon.Fist ? 0.4f : 0) + (Def.Weapon == Weapon.Spear ? 1.1f : 0);
+            bool inArc = AngDiff(Face, dir) < (fin && Def.Weapon != Weapon.Fist ? Mathf.PI : 1.9f);
+            // リーチ：弓以外は長め（剣と拳は +1.3、槍はさらに長い）
+            float reach = Boss.Radius + (fin ? 3.2f : 2.5f) + 1.3f - (Def.Weapon == Weapon.Fist ? 0.3f : 0) + (Def.Weapon == Weapon.Spear ? 1.1f : 0);
+            // 届く範囲が見えるように、剣圧（斬撃の光）を前に飛ばす
+            if (Def.Weapon != Weapon.Fist) Fx.SlashLine(Pos + fwd * (Def.Weapon == Weapon.Spear ? 3.2f : 2.4f) + Vector3.up * 1.1f, Color.Lerp(Def.ElemColor, Color.white, 0.35f), fin ? 6.5f : 4f);
             if (B.Alive && d < reach && inArc && B.Y < 2.5f)
             {
                 var hitPos = B.Pos + Vector3.up * 2.2f - Flat(B.Pos - Pos).normalized * Boss.Radius;
@@ -293,7 +296,7 @@ namespace AndoBoss
                 // らいとは、ときどき自慢する
                 if (fin && Random.value < 0.35f) G.Hud.WorldText(Pos + Vector3.up * 2.4f, Random.value < 0.5f ? "ぼくてんさいだから！" : "ぼくは数学の神だよ！", Def.ElemColor, 0.8f);
             }
-            if (Def.Weapon == Weapon.Fist) { Fx.Explosion(Pos + fwd * 1.3f + Vector3.up * 1.1f, Def.ElemColor, fin ? 0.9f : 0.35f); Sfx.Play("fire", fin ? 0.6f : 0.3f, 1.3f); }
+            if (Def.Weapon == Weapon.Fist) { Fx.Explosion(Pos + fwd * 2.2f + Vector3.up * 1.1f, Def.ElemColor, fin ? 1.1f : 0.5f); Sfx.Play("fire", fin ? 0.6f : 0.3f, 1.3f); }
         }
 
         void TryDodge()
@@ -392,7 +395,7 @@ namespace AndoBoss
                 else if (swing != null) Pos += mv * 1.2f * spd * dt;
                 else if (mv.sqrMagnitude > 0)
                 {
-                    Pos += mv * 6.8f * spd * dt;
+                    Pos += mv * 6.8f * Def.MoveMul * spd * dt;
                     Face = TurnTo(Face, Mathf.Atan2(mv.x, mv.z), dt * 14);
                     Moving = true;
                 }
@@ -593,7 +596,7 @@ namespace AndoBoss
             }
             else if (moveSpeed > 1f)
             {
-                walkT += dt * 11 * (Game.I.SlowT > 0 ? 0.6f : 1f);
+                walkT += dt * 11 * (Game.I.SlowT > 0 ? 0.6f : 1f) * Mathf.Sqrt(Def.MoveMul);
                 legSwing = Mathf.Sin(walkT) * 40;
                 armSwing = Mathf.Sin(walkT) * 35;
                 bob = Mathf.Abs(Mathf.Sin(walkT)) * 0.08f;

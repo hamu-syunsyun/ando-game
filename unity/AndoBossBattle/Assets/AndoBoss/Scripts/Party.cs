@@ -15,6 +15,7 @@ namespace AndoBoss
         public Elem Elem;
         public Weapon Weapon;
         public float AtkMul = 1f, Height = 1f, MaxHp = 1000f;
+        public float MoveMul = 1f, StamMul = 1f; // 足の速さ・スタミナの量
         public float[] SwingDmg, SwingDur;
         public float SkillCd;
         public string SkillName, BurstName, BurstShout;
@@ -28,7 +29,8 @@ namespace AndoBoss
         {
             new CharDef
             {
-                Id = 0, Name = "ともき", Title = "雷の受講生", Elem = Elem.Electro, Weapon = Weapon.Sword, MaxHp = 1500f, AtkMul = 1.25f,
+                Id = 0, Name = "ともき", Title = "俊足の雷", Elem = Elem.Electro, Weapon = Weapon.Sword, MaxHp = 1500f, AtkMul = 1.25f,
+                MoveMul = 1.9f, StamMul = 1.6f, Passive = "俊足：足の速さ1.9倍・スタミナ1.6倍",
                 SwingDmg = new[] { 40f, 48, 60, 105 }, SwingDur = new[] { 0.3f, 0.3f, 0.4f, 0.58f },
                 SkillCd = 8f, SkillName = "レポート提出", BurstName = "一夜漬け・雷光乱舞", BurstShout = "徹夜の力、見せでやる！",
                 Hair = new Color(0.3f, 0.22f, 0.45f), Jacket = new Color(0.16f, 0.18f, 0.32f), Pants = new Color(0.12f, 0.12f, 0.2f),
@@ -56,8 +58,8 @@ namespace AndoBoss
             {
                 Id = 3, Name = "らいと", Title = "自称・数学の神", Elem = Elem.Ice, Weapon = Weapon.Spear, MaxHp = 1300f, AtkMul = 1.3f, Height = 1.02f,
                 SwingDmg = new[] { 34f, 38, 52, 60, 115 }, SwingDur = new[] { 0.27f, 0.27f, 0.33f, 0.33f, 0.6f },
-                SkillCd = 8f, SkillName = "証明終了（Q.E.D.）", BurstName = "数学の神・無限連突き", BurstShout = "ぼくは数学の神だよ！",
-                Passive = "天才：会心率がいつも15%アップ（ぼくてんさいだから！）",
+                SkillCd = 8f, SkillName = "無限連突き", BurstName = "数学の神・絶対零度の証明", BurstShout = "ぼくは数学の神だよ！",
+                Passive = "天才：会心率がいつも15%アップ。奥義で凍らせた先生は「証明済み」になり、10秒間ダメージ1.5倍",
                 Hair = new Color(0.16f, 0.16f, 0.2f), Jacket = new Color(0.2f, 0.3f, 0.45f), Pants = new Color(0.14f, 0.15f, 0.22f),
                 Accent = new Color(0.6f, 0.88f, 1f), Eye = new Color(0.35f, 0.65f, 0.95f), Skin = new Color(1f, 0.88f, 0.78f),
             },

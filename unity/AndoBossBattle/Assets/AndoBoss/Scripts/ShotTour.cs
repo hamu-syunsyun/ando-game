@@ -110,13 +110,26 @@ namespace AndoBoss
                 yield return Wait(0.2f);
                 yield return ShotCo("056_pose");
                 G.Cam.EndCinematic();
+                // 特技
+                P.ShootT = 0; P.ThrustT = 0;
+                Fx.TimeMul = 0.2f;
+                if (P.Def.Id == 3) Skills.QED(P); else if (P.Def.Id == 0) Skills.Report(P);
+                yield return Wait(1.2f);
+                yield return ShotCo("057_skill");
+                yield return Wait(1.2f);
+                yield return ShotCo("058_skill");
+                Fx.TimeMul = 1f;
+                yield return Wait(1.5f);
             }
             G.Player.Energy = 100;
             G.StartBurst(G.Player);
             yield return Wait(0.5f);
             yield return ShotCo("06_cutin");
-            yield return Wait(1.6f);
+            yield return Wait(1.3f);
+            Fx.TimeMul = 0.2f;
+            yield return Wait(1.0f);
             yield return ShotCo("065_burst");
+            Fx.TimeMul = 1f;
             yield return Wait(1.4f);
             G.PerfectDodge();
             yield return Wait(0.3f);

@@ -36,6 +36,7 @@ namespace AndoBoss
         int selectStep;             // 0 = ボス選択, 1 = キャラ選択
         // パーティ共通のHP・スタミナ・デバフ
         public const float MaxStam = 150f;
+        public float MaxStamina => MaxStam * Player.Def.StamMul; // キャラによって多い（ともき）
         public float PartyHp = 1000f, PartyStam = MaxStam, StamDelay, SlowT;
         public int StartChar;
         public bool ReviveUsed;
@@ -129,6 +130,7 @@ namespace AndoBoss
             active = StartChar;
             Party[active].gameObject.SetActive(true);
             PartyHp = Player.MaxHp;
+            PartyStam = MaxStamina;
             swapCd = 0;
             ApplyBossSetup();
             TimeLeft = IsDouble ? DoubleTimeLimit : TimeLimit;
@@ -405,7 +407,7 @@ namespace AndoBoss
 
         void TickParty(float dt)
         {
-            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(MaxStam, PartyStam + dt * 55);
+            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(MaxStamina, PartyStam + dt * 55 * Player.Def.StamMul);
             SlowT = Mathf.Max(0, SlowT - dt);
             for (int i = 0; i < Party.Length; i++)
             {
@@ -582,7 +584,7 @@ namespace AndoBoss
             if (State != Mode.Battle || !B.Alive) return;
             float critRate = (P.BuffT > 0 ? 0.6f : 0.18f) + (P.Def.Weapon == Weapon.Spear ? 0.15f : 0f); // らいとの能力「天才」
             bool crit = Random.value < critRate;
-            float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * (B.DefDownT > 0 ? 1.3f : 1f) * Random.Range(0.9f, 1.1f);
+            float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * (B.DefDownT > 0 ? 1.3f : 1f) * (B.ProvenT > 0 ? 1.5f : 1f) * Random.Range(0.9f, 1.1f);
 
             // 属性コンボ
             var react = Elements.React(B.Aura, elem);

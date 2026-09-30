@@ -1083,9 +1083,9 @@ namespace AndoBoss
             var sp = cam.WorldToScreenPoint(P.Pos + Vector3.up * 1.8f);
             var stRt = stamRing.transform.parent as RectTransform;
             stRt.position = new Vector3(sp.x + 70 * canvas.scaleFactor, sp.y, 0);
-            stamRing.fillAmount = P.Stam / Game.MaxStam;
+            stamRing.fillAmount = P.Stam / G.MaxStamina;
             stamRing.color = P.Stam < Player.DodgeCost ? new Color(1, 0.35f, 0.3f) : new Color(0.95f, 0.85f, 0.3f);
-            stamGroup.alpha = Mathf.MoveTowards(stamGroup.alpha, P.Stam < Game.MaxStam - 0.5f && sp.z > 0 ? 1 : 0, dt * 4);
+            stamGroup.alpha = Mathf.MoveTowards(stamGroup.alpha, P.Stam < G.MaxStamina - 0.5f && sp.z > 0 ? 1 : 0, dt * 4);
 
             // スキル
             var ec = P.Def.ElemColor;
@@ -1123,7 +1123,7 @@ namespace AndoBoss
             }
             // 交代がなくなったので属性コンボは起きない。ボスの属性表示は出さない
             auraDot.enabled = false; auraText.enabled = false;
-            defDownText.text = B.DefDownT > 0 ? $"防御ダウン {B.DefDownT:0.0}" : "";
+            defDownText.text = (B.DefDownT > 0 ? $"防御ダウン {B.DefDownT:0.0}　" : "") + (B.ProvenT > 0 ? $"<color=#9ae0ff>証明済み（ダメージ1.5倍） {B.ProvenT:0.0}</color>" : "");
             burstIcon.color = ready ? Mat.Gold : new Color(1, 1, 1, 0.35f);
             burstIcon.transform.localRotation = Quaternion.Euler(0, 0, ready ? Time.unscaledTime * 90 : 0);
             burstRt.localScale = Vector3.one * (ready ? 1 + 0.05f * Mathf.Sin(Time.unscaledTime * 6) : 1);
