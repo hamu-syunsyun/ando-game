@@ -468,12 +468,12 @@ namespace AndoBoss
             {
                 // ジャスト回避は回避の出だし 0.1 秒だけ。無敵は 0.22 秒まで
                 if (!perfectUsed && DodgeAge < 0.1f) { perfectUsed = true; G.PerfectDodge(); return false; }
-                if (DodgeAge < 0.28f) return false;
+                if (DodgeAge < 0.22f) return false;
             }
             if (Inv > 0) return false;
             amount *= Game.I.EnemyDmgMul;
             Hp = Mathf.Max(0, Hp - amount);
-            Inv = 1.1f; HurtT = 0.4f;
+            Inv = 0.8f; HurtT = 0.5f;
             // ノックバック：攻撃の来た方向から吹き飛ばされる
             var away = Flat(Pos - from);
             if (away.sqrMagnitude < 0.01f) away = -Forward;

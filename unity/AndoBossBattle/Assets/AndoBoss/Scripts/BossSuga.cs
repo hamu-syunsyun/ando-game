@@ -10,7 +10,6 @@ namespace AndoBoss
     // その「カウント」をモチーフにした攻撃をする
     public partial class Boss
     {
-        float hakaiCd = 2f;
         public float PoseU; // 鎌を振る動きの進み具合（0〜1）
 
         static readonly Dictionary<string, string> SugaOne = new Dictionary<string, string>
@@ -153,11 +152,11 @@ namespace AndoBoss
         // ================= 攻撃の選び方 =================
         void PickSugaAttack()
         {
-            if (Phase == 2) hakaiCd -= 1;
             var opts = new List<string> { "count", "scythe", "words", "morau", "wall", "sheets", "listen", "redpen" };
             if (Phase == 2) { opts.Add("count"); opts.Add("wall"); }
             opts.RemoveAll(k => k == lastAtk);
-            if (Phase == 2 && hakaiCd <= 0) { opts.Clear(); opts.Add("hakai"); hakaiCd = 5; }
+            // 必殺「北の破壊神」：時間で来る（本気モードでは短い間隔で）
+            if (sansouCd <= 0) { opts.Clear(); opts.Add("hakai"); sansouCd = Phase == 2 ? 13f : 18f; }
             var pick = opts[Random.Range(0, opts.Count)];
             lastAtk = pick;
             walking = false;

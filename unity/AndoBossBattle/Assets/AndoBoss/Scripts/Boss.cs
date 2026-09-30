@@ -215,7 +215,7 @@ namespace AndoBoss
         {
             HpMax = (Game.IsDouble ? DoubleHp : MaxHp) * Game.BossHpMul;
             Pos = HomePos; Y = 0; Face = Mathf.PI; Hp = HpMax; LagHp = HpMax; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
-            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; ProvenT = 0; Aura = Elem.None; AuraT = 0; hakaiCd = 2f; PoseU = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
+            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; ProvenT = 0; Aura = Elem.None; AuraT = 0; PoseU = 0; sansouCd = 12f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
             restT = 1.2f; lastAtk = null; atk = null;
             aura.SetActive(false);
             dizzy.SetActive(false);
@@ -283,6 +283,8 @@ namespace AndoBoss
             AuraT -= dt;
             DefDownT = Mathf.Max(0, DefDownT - dt);
             ProvenT = Mathf.Max(0, ProvenT - dt);
+            // 必殺技までの待ち時間は、攻撃中も含めていつも減る（前は休み中しか減らず、なかなか来なかった）
+            if (atk == null || (lastAtk != "sansou" && lastAtk != "hakai")) sansouCd -= dt;
             if (ProvenT > 0 && Random.value < 0.35f) Fx.Stars(Pos + Vector3.up * Random.Range(1f, 5f) + Random.insideUnitSphere * 1.2f, new Color(0.6f, 0.88f, 1f), 1);
             if (AuraT <= 0) Aura = Elem.None;
             if (FreezeT > 0)
@@ -332,7 +334,6 @@ namespace AndoBoss
                 return;
             }
             restT -= dt;
-            sansouCd -= dt;
             walking = false;
             if (d > 6)
             {
@@ -358,7 +359,7 @@ namespace AndoBoss
                     case "slam": atk = AtkSlam(); break;
                     case "iyaiya": atk = AtkIyaiya(); break;
                     case "trans": atk = AtkTrans(); break;
-                    case "sansou": atk = AtkSansou(); sansouCd = Phase == 2 ? 16f : 26f; break;
+                    case "sansou": atk = AtkSansou(); sansouCd = Phase == 2 ? 13f : 18f; break;
                     case "laser": atk = AtkLaser(); break;
                     default: atk = AtkSpiral(); break;
                 }

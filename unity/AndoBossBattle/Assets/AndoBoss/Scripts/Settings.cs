@@ -30,7 +30,7 @@ namespace AndoBoss
         // ダブル（安東＋菅原）のときは2人ぶんの攻撃を受けるので、体力の増え方を多めにする
         static readonly float[] DiffPlayerHpDouble = { 1f, 1.25f, 1.5f, 1.8f };
         public static float PlayerHpMul => (IsDouble ? DiffPlayerHpDouble : DiffPlayerHp)[Difficulty];
-        static readonly float[] DiffRest = { 1.5f, 1f, 0.85f, 0.7f };
+        static readonly float[] DiffRest = { 1.8f, 1f, 0.65f, 0.4f };
         static readonly float[] DiffScore = { 0.7f, 1f, 1.2f, 1.5f };
         public static float BossHpMul => DiffHp[Difficulty];
         public static float BossRestMul => DiffRest[Difficulty];
