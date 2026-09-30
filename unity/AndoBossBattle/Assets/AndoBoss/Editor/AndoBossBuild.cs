@@ -12,6 +12,41 @@ namespace AndoBoss.EditorTools
         const string OutDir = "Builds/Windows";
         const string ExeName = "AndoBossBattle.exe";
 
+        // 実名なし版（先生・キャラの名前を実在しない名前に置きかえた版）
+        const string AnonOutDir = "Builds/WindowsAnon";
+        const string AnonExeName = "BossBattle.exe";
+
+        [MenuItem("安東ボス戦/Windows用のexeを作る（実名なし版）")]
+        static void BuildAnonFromMenu()
+        {
+            var report = BuildAnon();
+            if (report.summary.result == BuildResult.Succeeded)
+            {
+                EditorUtility.RevealInFinder(Path.Combine(AnonOutDir, AnonExeName));
+                EditorUtility.DisplayDialog("安東ボス戦", $"実名なし版の exe ができました。\n{Path.GetFullPath(AnonOutDir)}", "OK");
+            }
+            else EditorUtility.DisplayDialog("安東ボス戦", "ビルドに失敗しました。Console のエラーを見てください。", "OK");
+        }
+
+        public static void BuildWindowsAnon()
+        {
+            var report = BuildAnon();
+            EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);
+        }
+
+        static BuildReport BuildAnon()
+        {
+            // ウィンドウの題名からも名前を消す（ビルドが終わったら元に戻す）
+            var oldName = PlayerSettings.productName;
+            try
+            {
+                AndoBossSetup.EnsureScene();
+                PlayerSettings.productName = "単位をもぎとれ ボス戦";
+                return Build(BuildTarget.StandaloneWindows64, Path.Combine(AnonOutDir, AnonExeName), new[] { "ANDO_ANON" }, false);
+            }
+            finally { PlayerSettings.productName = oldName; }
+        }
+
         [MenuItem("安東ボス戦/Windows用のexeを作る")]
         static void BuildFromMenu()
         {
@@ -39,9 +74,9 @@ namespace AndoBoss.EditorTools
 
         static BuildReport Build() => Build(BuildTarget.StandaloneWindows64, Path.Combine(OutDir, ExeName));
 
-        static BuildReport Build(BuildTarget target, string path)
+        static BuildReport Build(BuildTarget target, string path, string[] defines = null, bool setup = true)
         {
-            AndoBossSetup.EnsureScene();
+            if (setup) AndoBossSetup.EnsureScene();
             // 使っていないライブラリのコードを削って、配りやすい大きさにする
             PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedStrippingLevel.Medium);
             PlayerSettings.usePlayerLog = true;
@@ -52,6 +87,7 @@ namespace AndoBoss.EditorTools
                 locationPathName = path,
                 target = target,
                 options = BuildOptions.None,
+                extraScriptingDefines = defines,
             };
             var report = BuildPipeline.BuildPlayer(opts);
             Debug.Log($"[安東ボス戦] ビルド結果: {report.summary.result}  サイズ: {report.summary.totalSize / 1024 / 1024} MB  エラー: {report.summary.totalErrors}");

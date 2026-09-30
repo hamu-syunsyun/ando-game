@@ -749,6 +749,29 @@ namespace AndoBoss
             scaler.matchWidthOrHeight = aspect < 16f / 9f - 0.01f ? 0f : 1f;
         }
 
+        // 実名なし版：画面の文字に出てくる名前を、描画の直前に置きかえる
+        Text[] allTexts;
+        int textScanFrame = -999;
+        readonly Dictionary<Text, string> fixedTexts = new Dictionary<Text, string>();
+        void LateUpdate()
+        {
+            if (!Names.Anon) return;
+            if (allTexts == null || Time.frameCount - textScanFrame > 20)
+            {
+                allTexts = GetComponentsInChildren<Text>(true);
+                textScanFrame = Time.frameCount;
+            }
+            foreach (var t in allTexts)
+            {
+                if (!t) continue;
+                var s = t.text;
+                if (fixedTexts.TryGetValue(t, out var done) && ReferenceEquals(done, s)) continue;
+                var n = Names.Fix(s);
+                if (!ReferenceEquals(n, s)) t.text = n;
+                fixedTexts[t] = t.text;
+            }
+        }
+
         void Update()
         {
             FitScaler();
