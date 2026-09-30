@@ -574,46 +574,102 @@ namespace AndoBoss
             G.OnHakai();
             Pose = "raise";
             lockFace = false;
-            int n = 5;
-            for (int i = 0; i < n; i++)
+            // 「正」の字（カウント5）の5画が、巨大な壁になって順番に落ちてくる。画と画のすき間が安全地帯。
+            // 最後に5画がそろうと中心から衝撃波（ジャンプでよける）
+            var P = G.Player;
+            var center = ClampArena(Player.Flat(P.Pos), 6f);
+            var up = Player.Flat(P.Pos - Pos);
+            up = up.sqrMagnitude > 0.01f ? up.normalized : Vector3.forward;
+            var right = new Vector3(up.z, 0, -up.x);
+            const float S = 11f, W = 2.6f, H = 9f, gap = 0.34f, warn = 0.5f;
+            // 画の始点と終点（字の中心が原点、x が右、y が上）
+            Vector2[,] strokes =
+            {
+                { new Vector2(-0.95f, 0.9f), new Vector2(0.95f, 0.9f) },
+                { new Vector2(0f, 0.9f), new Vector2(0f, -0.9f) },
+                { new Vector2(0f, 0.05f), new Vector2(0.7f, 0.05f) },
+                { new Vector2(-0.6f, 0.05f), new Vector2(-0.6f, -0.9f) },
+                { new Vector2(-1.05f, -0.9f), new Vector2(1.05f, -0.9f) },
+            };
+            Vector3 W2(Vector2 c) => center + right * (c.x * S) + up * (c.y * S);
+            for (int i = 0; i < 5; i++)
             {
                 int k = i;
-                Fx.Later(0.9f + k * 0.85f, () =>
+                var a = W2(strokes[k, 0]); var b = W2(strokes[k, 1]);
+                Fx.Later(k * gap, () =>
                 {
                     if (!Alive || Game.I.State != Game.Mode.Battle) return;
-                    var target = ClampArena(Player.Flat(Game.I.Player.Pos));
-                    Fx.TelegraphCircle(target, 4f, 0, 0.8f, () =>
-                    {
-                        Fx.Pillar(target, SugaPurple, 4f, 30f, 0.9f);
-                        Fx.Explosion(target + Vector3.up, SugaPurple, 1.8f);
-                        Fx.Bolt(target, SugaPurple, 0.8f, 40);
-                        Sfx.Play("boom", 1f, 0.8f);
-                        Sfx.Play("thunder", 0.7f, 0.7f);
-                        Game.I.Cam.Shake(0.6f);
-                        PostFX.I?.Chroma(0.2f);
-                        var pp = Game.I.Player.Pos;
-                        if (Player.Flat(pp - target).magnitude < 4f && pp.y < 3) Game.I.Player.TakeHit(200, target);
-                        // 着弾点から衝撃波（ジャンプでよける）
-                        bool hitW = false;
-                        Fx.ShockWall(target, SugaPurple, (r, dt) =>
-                        {
-                            var p2 = Game.I.Player;
-                            float d = Player.Flat(p2.Pos - target).magnitude;
-                            if (!hitW && Mathf.Abs(d - r) < 0.6f && p2.Pos.y < 0.55f) hitW = p2.TakeHit(120, target);
-                            return r < 14 && Alive;
-                        });
-                    });
+                    var dir = Player.Flat(b - a); float len = dir.magnitude; dir /= len;
+                    Fx.TelegraphBand(a - dir * W * 0.5f, dir, len + W, W, warn);
+                    Sfx.Play("warn", 0.4f, 1.2f + k * 0.05f);
+                    Fx.Later(warn, () => SlamStroke(a, b, W, H, k));
                 });
             }
-            float t = 0, total = 1.0f + n * 0.85f + 1.2f;
+            // 5画そろったら、字の中心から大きな衝撃波
+            Fx.Later(4 * gap + warn + 0.5f, () =>
+            {
+                if (!Alive || Game.I.State != Game.Mode.Battle) return;
+                Game.I.Hud.WorldText(center + Vector3.up * 6f, "カウント５", SugaRed, 1.6f);
+                Sfx.Play("boom", 1f, 0.6f);
+                Sfx.Play("roar", 0.6f, 0.6f);
+                Game.I.Cam.Shake(0.8f);
+                PostFX.I?.Flash(new Color(0.7f, 0.4f, 1f), 0.4f);
+                bool hitW = false;
+                Fx.ShockWall(center, SugaPurple, (r, dt) =>
+                {
+                    var p2 = Game.I.Player;
+                    float d = Player.Flat(p2.Pos - center).magnitude;
+                    if (!hitW && Mathf.Abs(d - r) < 0.7f && p2.Pos.y < 0.6f) hitW = HitWithCount(130, center);
+                    return r < 22 && Alive;
+                });
+            });
+            float t = 0, total = 4 * gap + warn + 1.6f;
             return dt =>
             {
                 t += dt;
-                Y = t < total - 0.4f ? Mathf.Lerp(Y, 4.5f, dt * 2) : Mathf.Lerp(Y, 0, dt * 10);
+                Y = t < total - 0.4f ? Mathf.Lerp(Y, 4.5f, dt * 3) : Mathf.Lerp(Y, 0, dt * 10);
                 if (Random.value < 0.5f) Fx.Embers(Pos + Vector3.up * (Y + Random.Range(0f, 5f)) + Random.insideUnitSphere * 2, SugaPurple, 1);
                 if (t >= total) { Y = 0; Sfx.Play("stomp", 1f, 0.8f); Game.I.Cam.Shake(0.4f); return false; }
                 return true;
             };
+        }
+
+        // 「正」の1画：空から巨大な壁が落ちてきて、しばらく残る
+        void SlamStroke(Vector3 a, Vector3 b, float w, float h, int k)
+        {
+            if (!Alive || Game.I.State != Game.Mode.Battle) return;
+            var mid = (a + b) * 0.5f;
+            var dir = Player.Flat(b - a); float len = dir.magnitude; dir /= len;
+            var m = Mat.Fx(new Color(SugaPurple.r, SugaPurple.g, SugaPurple.b, 0.75f), Mat.WallTex, true, 1.7f);
+            var core = Mat.Fx(new Color(1f, 0.35f, 0.45f, 0.9f), Mat.WallTex, true, 1.6f);
+            var go = Fx.Obj("pillar", Mat.Cube, m, new Vector3(mid.x, h * 0.5f, mid.z), Quaternion.LookRotation(dir), new Vector3(w, h, len + w));
+            var inner = Mat.Part(go.transform, Mat.Cube, core, Vector3.zero, new Vector3(0.35f, 1f, 1f), default, false);
+            _ = inner;
+            Sfx.Play("boom", 0.9f, 0.85f + k * 0.04f);
+            Sfx.Play("stomp", 0.8f, 0.7f);
+            Game.I.Cam.Shake(0.5f);
+            PostFX.I?.Chroma(0.2f);
+            for (float s = 0; s <= len; s += 3f) Fx.Debris(a + dir * s + Vector3.up * 0.3f, new Color(0.35f, 0.3f, 0.4f), 3);
+            Fx.Bolt(mid, SugaPurple, 0.5f, 30);
+            bool hit = false;
+            float t = 0;
+            Fx.Run(dt =>
+            {
+                t += dt;
+                // 空から落ちてきて、1.1秒のこって、しずんで消える
+                float drop = Mathf.Clamp01(t / 0.12f);
+                float sink = t > 1.1f ? Mathf.Clamp01((t - 1.1f) / 0.3f) : 0;
+                go.transform.position = new Vector3(mid.x, h * 0.5f + (1 - drop) * 14f - sink * h, mid.z);
+                if (!hit && drop >= 1 && sink < 0.5f && Alive)
+                {
+                    var pl = Game.I.Player;
+                    var rel = Player.Flat(pl.Pos) - a;
+                    float along = Vector3.Dot(rel, dir), across = Mathf.Abs(Vector3.Dot(rel, new Vector3(dir.z, 0, -dir.x)));
+                    if (along > -w * 0.5f && along < len + w * 0.5f && across < w * 0.5f + 0.4f && pl.Pos.y < h)
+                        hit = HitWithCount(160, pl.Pos - new Vector3(dir.z, 0, -dir.x) * Mathf.Sign(Vector3.Dot(rel, new Vector3(dir.z, 0, -dir.x))));
+                }
+                return t < 1.4f;
+            }, go);
         }
     }
 }

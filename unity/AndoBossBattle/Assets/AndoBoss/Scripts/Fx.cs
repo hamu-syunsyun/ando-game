@@ -442,6 +442,8 @@ namespace AndoBoss
             I.hitStop = 0; I.slowT = 0; I.slowScale = 1;
         }
 
+        // 動作確認の撮影用：時間の進みをまとめてゆっくりにする（ふだんは 1）
+        public static float TimeMul = 1f;
         public static void HitStop(float sec) { if (I) I.hitStop = Mathf.Max(I.hitStop, sec); }
         public static void Slow(float scale, float realSec)
         {
@@ -456,7 +458,7 @@ namespace AndoBoss
             if (hitStop > 0) hitStop -= rdt;
             if (slowT > 0) { slowT -= rdt; if (slowT <= 0) slowScale = 1; }
             float ts = Paused ? 0 : hitStop > 0 ? 0.03f : slowT > 0 ? slowScale : 1f;
-            Time.timeScale = ts;
+            Time.timeScale = ts * TimeMul;
 
             float dt = Time.deltaTime;
             if (adding.Count > 0) { jobs.AddRange(adding); adding.Clear(); }

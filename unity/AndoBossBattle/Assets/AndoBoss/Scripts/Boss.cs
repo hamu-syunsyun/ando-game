@@ -391,6 +391,20 @@ namespace AndoBoss
             // 菅原先生は背が高いので、氷も縦に大きく
             iceBlock.transform.localScale = IsSuga ? new Vector3(0.85f, 1.3f, 0.85f) : Vector3.one;
         }
+        // 動作確認用：指定した攻撃をすぐに出す（スクリーンショットの自動撮影で使う）
+        public void DebugAttack(string name)
+        {
+            restT = 99; walking = false;
+            switch (name)
+            {
+                case "sansou": atk = AtkSansou(); break;
+                case "hakai": atk = AtkHakai(); break;
+                case "listen": atk = AtkListen(); break;
+                case "redpen": atk = AtkRedPen(); break;
+                case "sheets": atk = AtkSheets(); break;
+            }
+        }
+
         // セリフは自分の名前で言う（ダブルのときにどっちが話したか分かるように）
         void Speak(string text, float sec = 2.6f) => Game.I.Say(text, sec, Name);
 
@@ -633,70 +647,130 @@ namespace AndoBoss
             G.OnSansou();
             Pose = "raise";
             lockFace = true;
-            Sfx.Play("warn", 0.7f, 0.9f);
-            Sfx.Play("hum3", 0.9f);
+            Sfx.Play("warn", 0.8f, 0.8f);
+            Sfx.Play("hum3", 1f);
+            Sfx.Play("laserCharge", 0.8f, 0.7f);
             Color[] cols = { new Color(1f, 0.3f, 0.3f), new Color(1f, 0.85f, 0.25f), new Color(0.35f, 0.6f, 1f) };
-            float t = 0, emit = 0;
-            float aim = 0;
-            float[] dirs = Phase == 2 ? new[] { -0.55f, 0f, 0.55f } : new[] { 0f };
-            return dt =>
+            var P = G.Player;
+            float aim = Mathf.Atan2(P.Pos.x - Pos.x, P.Pos.z - Pos.z);
+            Face = aim;
+            var fwd = new Vector3(Mathf.Sin(aim), 0, Mathf.Cos(aim));
+            var side = new Vector3(fwd.z, 0, -fwd.x);
+            var origin = Player.Flat(Pos) + fwd * 1.2f;
+            // 3本の正弦波の「壁」。120度ずつずれていて、波は横に流れていく（すき間も動く）
+            float A = Phase == 2 ? 8.5f : 7.5f, omega = Phase == 2 ? 3.2f : 2.3f, life = Phase == 2 ? 3.6f : 3.0f;
+            const float lambda = 18f, H = 7f, startup = 0.55f, grow = 30f, maxLen = 46f;
+            var root = new GameObject("wave3");
+            var meshes = new Mesh[3];
+            var mats = new Material[3];
+            for (int k = 0; k < 3; k++)
+            {
+                meshes[k] = new Mesh(); meshes[k].MarkDynamic();
+                mats[k] = Mat.Fx(new Color(cols[k].r, cols[k].g, cols[k].b, 1f), SineWallTex, true, 1.9f);
+                var go = new GameObject("ph" + k);
+                go.transform.SetParent(root.transform, false);
+                go.AddComponent<MeshFilter>().sharedMesh = meshes[k];
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = mats[k];
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            float t = 0; bool boomed = false;
+            Fx.Run(dt =>
             {
                 t += dt;
-                if (t < 1.2f)
+                bool warm = t < startup;
+                float front = warm ? maxLen : Mathf.Min(maxLen, (t - startup) * grow);
+                float h = warm ? 0.12f : Mathf.Min(H, 0.12f + (t - startup) * 45f);
+                if (t > startup + life) h *= Mathf.Clamp01(1 - (t - startup - life) / 0.35f);
+                float wt = t * omega;
+                for (int k = 0; k < 3; k++)
                 {
-                    var P = Game.I.Player;
-                    aim = Mathf.Atan2(P.Pos.x - Pos.x, P.Pos.z - Pos.z);
-                    Face = aim;
-                    for (int k = 0; k < 3; k++)
-                        if (Random.value < 0.5f) Fx.Embers(StickTip + Random.insideUnitSphere * 0.6f, cols[k], 1);
-                    return true;
+                    BuildSineWall(meshes[k], origin, fwd, side, A, lambda, k * Mathf.PI * 2 / 3 - wt, front, h);
+                    float a = warm ? 0.6f + 0.4f * Mathf.Sin(t * 40) : 0.85f;
+                    mats[k].SetColor("_Color", new Color(cols[k].r, cols[k].g, cols[k].b, a));
                 }
-                Pose = "point";
-                if (t < 1.2f + 2.6f)
+                if (!warm && !boomed)
                 {
-                    // 狙いはゆっくりプレイヤーを追う
-                    var P = Game.I.Player;
-                    aim = Player.TurnTo(aim, Mathf.Atan2(P.Pos.x - Pos.x, P.Pos.z - Pos.z), dt * 0.6f);
-                    Face = aim;
-                    emit -= dt;
-                    if (emit <= 0)
-                    {
-                        emit = 0.075f;
-                        foreach (var off in dirs)
-                            for (int k = 0; k < 3; k++) WaveShot(aim + off, k * Mathf.PI * 2 / 3, cols[k]);
-                    }
-                    return true;
+                    boomed = true;
+                    Sfx.Play("laser", 1f, 0.75f);
+                    Sfx.Play("thunder", 0.8f, 0.8f);
+                    Game.I.Cam.Shake(0.6f);
+                    PostFX.I?.Chroma(0.2f);
                 }
-                lockFace = false;
-                return t < 4.4f;
+                // 当たり判定：プレイヤーの位置での、3本の波の横位置と比べる
+                if (!warm && h > 1.2f && Alive)
+                {
+                    var pl = Game.I.Player;
+                    var rel = Player.Flat(pl.Pos) - origin;
+                    float sp = Vector3.Dot(rel, fwd), lp = Vector3.Dot(rel, side);
+                    if (sp > 0 && sp < front && pl.Pos.y < h)
+                        for (int k = 0; k < 3; k++)
+                        {
+                            float lat = A * Mathf.Sin(2 * Mathf.PI * sp / lambda + k * Mathf.PI * 2 / 3 - wt);
+                            if (Mathf.Abs(lp - lat) < 0.85f && pl.TakeHit(150, origin + fwd * sp + side * lat))
+                            {
+                                Fx.Sparks(pl.Pos + Vector3.up, cols[k], 16, 1.2f);
+                                break;
+                            }
+                        }
+                }
+                if (Random.value < 0.6f) Fx.Embers(origin + fwd * Random.Range(2f, front) + side * Random.Range(-A, A) + Vector3.up * Random.Range(0f, h), cols[Random.Range(0, 3)], 1);
+                bool more = t < startup + life + 0.35f && Alive && Game.I.State == Game.Mode.Battle;
+                if (!more) foreach (var m in meshes) Destroy(m);
+                return more;
+            }, root);
+            float at = 0;
+            return dt =>
+            {
+                at += dt;
+                if (at > startup) Pose = "point";
+                for (int k = 0; k < 3; k++) if (Random.value < 0.5f) Fx.Embers(StickTip + Random.insideUnitSphere * 0.6f, cols[k], 1);
+                if (at > startup + life) { lockFace = false; return false; }
+                return true;
             };
         }
 
-        void WaveShot(float angle, float phase, Color c)
+        // 三相交流の壁のテクスチャ：上下のふちが明るく、縦じまが流れる
+        static Texture2D sineWallTex;
+        static Texture2D SineWallTex => sineWallTex != null ? sineWallTex : (sineWallTex = MakeSineWallTex());
+        static Texture2D MakeSineWallTex()
         {
-            var g = new GameObject("bullet");
-            var glow = Mat.Part(g.transform, Mat.Quad, Mat.FxShared(new Color(c.r, c.g, c.b, 1f), Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 1.1f, default, false);
-            glow.AddComponent<Billboard>();
-            var core = Mat.Part(g.transform, Mat.Quad, Mat.FxShared(Color.white, Mat.Glow, true, 3f), Vector3.zero, Vector3.one * 0.4f, default, false);
-            core.AddComponent<Billboard>();
-            var fwd = new Vector3(Mathf.Sin(angle), 0, Mathf.Cos(angle));
-            var side = new Vector3(fwd.z, 0, -fwd.x);
-            var origin = new Vector3(Pos.x, 1.1f, Pos.z) + fwd * 1.8f;
-            const float A = 2.4f, lambda = 9f, speed = 10f;
-            float s = 0;
-            Fx.Run(dt =>
+            var tex = Mat.MakeTex(64, (x, y) =>
             {
-                if (g == null) return false;
-                s += speed * dt;
+                // 中はうすく（向こうが透けて見える）、上下のふちと縦じまだけ明るく
+                float edge = Mathf.Max(Mathf.Pow(1 - y, 7f), Mathf.Pow(y, 10f));
+                float stripe = Mathf.Pow(0.5f + 0.5f * Mathf.Sin(x * Mathf.PI * 12), 8f);
+                float a = 0.2f + 0.8f * edge + 0.3f * stripe;
+                return new Color(1, 1, 1, Mathf.Clamp01(a));
+            });
+            tex.wrapMode = TextureWrapMode.Repeat;
+            return tex;
+        }
+
+        // 正弦波にそって立つ縦の帯を、毎フレーム作りなおす（ワールド座標）
+        static void BuildSineWall(Mesh mesh, Vector3 origin, Vector3 fwd, Vector3 side, float A, float lambda, float phase, float len, float h)
+        {
+            const float step = 0.5f;
+            int n = Mathf.Max(2, Mathf.CeilToInt(len / step) + 1);
+            var v = new Vector3[n * 2]; var uv = new Vector2[n * 2]; var tri = new int[(n - 1) * 6];
+            for (int i = 0; i < n; i++)
+            {
+                float s = Mathf.Min(len, i * step);
                 var p = origin + fwd * s + side * (A * Mathf.Sin(2 * Mathf.PI * s / lambda + phase));
-                g.transform.position = p;
-                var P = Game.I.Player;
-                if (new Vector2(p.x - P.Pos.x, p.z - P.Pos.z).magnitude < 0.6f && P.Pos.y < 1.6f)
+                v[i * 2] = new Vector3(p.x, 0.02f, p.z);
+                v[i * 2 + 1] = new Vector3(p.x, h, p.z);
+                uv[i * 2] = new Vector2(s / 6f, 0);
+                uv[i * 2 + 1] = new Vector2(s / 6f, 1);
+                if (i < n - 1)
                 {
-                    if (P.TakeHit(110, p - fwd)) { Fx.Sparks(p, c, 8, 0.8f); return false; }
+                    int b = i * 6, q = i * 2;
+                    tri[b] = q; tri[b + 1] = q + 1; tri[b + 2] = q + 2;
+                    tri[b + 3] = q + 1; tri[b + 4] = q + 3; tri[b + 5] = q + 2;
                 }
-                return s < 34 && Alive;
-            }, g);
+            }
+            mesh.Clear();
+            mesh.vertices = v; mesh.uv = uv; mesh.triangles = tri;
+            mesh.RecalculateBounds();
         }
 
         // 第2形態：指示棒から極太ビームを出して薙ぎ払う
@@ -848,10 +922,10 @@ namespace AndoBoss
             }, g);
         }
 
-        static Vector3 ClampArena(Vector3 p)
+        static Vector3 ClampArena(Vector3 p, float margin = 1f)
         {
             var f = Player.Flat(p);
-            if (f.magnitude > World.ArenaR - 1) f = f.normalized * (World.ArenaR - 1);
+            if (f.magnitude > World.ArenaR - margin) f = f.normalized * (World.ArenaR - margin);
             return f;
         }
 

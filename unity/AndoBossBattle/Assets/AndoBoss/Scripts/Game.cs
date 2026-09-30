@@ -568,7 +568,7 @@ namespace AndoBoss
 
         public void OnHakai()
         {
-            Hud.Banner("北の破壊神", "空から落ちる破壊の柱と衝撃波に注意！", new Color(0.7f, 0.4f, 1f), 1.8f);
+            Hud.Banner("必殺「北の破壊神」", "「正」の字の壁が落ちてくる！ 画のすき間にもぐりこめ！", new Color(0.7f, 0.4f, 1f), 1.8f);
             Sky.SetStorm(1);
             Sky.Flash(1f);
             Cam.Shake(0.6f);
@@ -762,7 +762,7 @@ namespace AndoBoss
 
         public void OnSansou()
         {
-            Hud.Banner("必殺「三相交流」", "3本の波のすき間をぬってよけろ！", new Color(1f, 0.4f, 0.35f), 1.6f);
+            Hud.Banner("必殺「三相交流」", "3枚の波の壁のすき間にもぐりこめ！（ジャンプでは越えられない）", new Color(1f, 0.4f, 0.35f), 1.6f);
             Cam.Shake(0.4f);
             PostFX.I?.Radial(0.3f);
         }

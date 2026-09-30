@@ -59,6 +59,28 @@ namespace AndoBoss
             G.GoBattle();
             yield return Wait(1.8f);
             yield return ShotCo("04_battle");
+            // 必殺技の見た目の確認
+            {
+                var B = G.Boss;
+                var P = G.Player;
+                B.DebugAttack(B.IsSuga ? "hakai" : "sansou");
+                Fx.TimeMul = 0.2f; // 仮想画面はコマ落ちするので、ゆっくり進めて途中の様子を撮る
+                yield return Wait(0.35f);
+                yield return ShotCo("041_special");
+                yield return Wait(0.9f);
+                P.Inv = 5f;
+                yield return ShotCo("042_special");
+                yield return Wait(1.0f);
+                yield return ShotCo("043_special");
+                // 横から大きく見る
+                G.Cam.Cinematic(B.Pos + new Vector3(18, 12, -14), B.Pos + new Vector3(0, 2, -10), 55, true);
+                yield return Wait(0.3f);
+                yield return ShotCo("044_special");
+                G.Cam.EndCinematic();
+                Fx.TimeMul = 1f;
+                yield return Wait(3f);
+                G.PartyHp = G.Player.MaxHp; G.Counts = 0;
+            }
             for (int i = 0; i < 12; i++)
             {
                 G.DamageBoss(60, Game.HitKind.Normal, G.Boss.Pos + Vector3.up * 2.5f);
