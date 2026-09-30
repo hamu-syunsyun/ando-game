@@ -489,85 +489,61 @@ namespace AndoBoss
         // ================= らいと =================
         static readonly string[] MathSigns = { "∫", "Σ", "π", "∞", "√", "∂", "θ", "e^iπ", "Q.E.D." };
 
-        // らいとの特技「無限連突き」：ボスへ飛びこみ、残像の槍をいっぱい突きこむ（24連）→ 最後に大きな一突き
+        // らいとの特技「証明終了（氷塊落とし）」：槍を空に掲げると、巨大な氷の塊がボスの真上から落ちてくる（1発）
         public static void QED(Player p)
         {
             var ec = p.Def.ElemColor;
-            Sfx.Play("whoosh", 1f, 1.25f);
-            Sfx.Play("ice", 0.7f, 1.1f);
-            const int n = 24; const float gap = 0.05f;
-            float total = 0.2f + n * gap + 0.35f;
-            p.ThrustT = total; p.LockT = total;
-            p.Inv = Mathf.Max(p.Inv, total + 0.2f);
-            bool near = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 16;
-            var d = near ? Player.Flat(B.Pos - p.Pos).normalized : p.Forward;
-            if (d.sqrMagnitude < 0.01f) d = p.Forward;
-            p.Face = Mathf.Atan2(d.x, d.z);
-            var from = p.Pos;
-            var to = near ? B.Pos - d * (Boss.Radius + 2.2f) : p.Pos + d * 7f;
-            to.y = 0;
-            G.Hud.WorldText(p.Pos + Vector3.up * 2.6f, "ぼくてんさいだから！", ec, 0.9f);
+            p.ThrustT = 0.35f; p.LockT = 0.35f;
+            Sfx.Play("ice", 0.8f, 0.9f);
+            Sfx.Play("whoosh", 0.8f, 0.7f);
+            bool near = B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < 20;
+            var target = near ? Player.Flat(B.Pos) : Player.Flat(p.Pos + p.Forward * 8f);
+            G.Hud.WorldText(p.Pos + Vector3.up * 2.6f, "ぼくてんさいだから！", ec, 0.8f);
+            Fx.Ring(target, 4.5f, ec, 0.5f);
+            // 氷の塊（とがった結晶を組み合わせる）
+            var go = new GameObject("icedrop");
+            var m = Mat.ToonShared(new Color(0.72f, 0.9f, 1f), 0.02f);
+            var mg = Mat.FxShared(new Color(ec.r, ec.g, ec.b, 0.8f), Mat.Glow, true, 2.2f);
+            Mat.Part(go.transform, Mat.Cube, m, Vector3.zero, new Vector3(2.6f, 2.2f, 2.6f), new Vector3(20, 35, 15));
+            Mat.Part(go.transform, Mat.Cube, m, new Vector3(0.6f, 0.9f, -0.3f), new Vector3(1.4f, 2.4f, 1.4f), new Vector3(-10, 10, 25));
+            Mat.Part(go.transform, Mat.Cube, m, new Vector3(-0.8f, -0.4f, 0.5f), new Vector3(1.3f, 1.8f, 1.3f), new Vector3(30, -20, -15));
+            var glow = Mat.Part(go.transform, Mat.Quad, mg, Vector3.zero, Vector3.one * 6f, default, false);
+            glow.AddComponent<Billboard>();
+            const float fall = 0.5f;
             float t = 0;
             Fx.Run(dt =>
             {
                 t += dt;
-                float u = Mathf.Clamp01(t / 0.18f);
-                var pos = Vector3.Lerp(from, to, u);
-                p.Pos = new Vector3(pos.x, p.Pos.y, pos.z);
-                Fx.Sparks(p.Pos + Vector3.up, ec, 2, 0.5f);
-                return t < 0.2f;
-            });
-            for (int i = 0; i < n; i++)
-            {
-                int k = i;
-                Fx.Later(0.2f + k * gap, () =>
-                {
-                    if (G.State != Game.Mode.Battle) return;
-                    var fwd = p.Forward; var side = new Vector3(fwd.z, 0, -fwd.x);
-                    // 残像の槍：体のまわりのいろんな位置から、ボスへ突き刺さる
-                    var start = p.Pos + Vector3.up * Random.Range(0.6f, 2.2f) + side * Random.Range(-1.6f, 1.6f) - fwd * 0.3f;
-                    var target = B.Alive ? B.Pos + Vector3.up * (B.Y + Random.Range(1.2f, 3.4f)) + Random.insideUnitSphere * 0.6f : start + fwd * 5f;
-                    PhantomSpear(start, target, k % 3 == 0 ? Color.white : ec);
-                    Sfx.Play(k % 2 == 0 ? "slash0" : "slash1", 0.45f, 1.5f, 0.2f);
-                    if (k % 2 == 0) Sfx.Play("multihit", 0.45f, 1.3f);
-                    if (B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < Boss.Radius + 5f)
-                    {
-                        G.DamageBoss(22, Game.HitKind.Skill, target, k == 0 ? Elem.Ice : Elem.None, true);
-                        if (k % 4 == 0) Fx.IceSpike(Player.Flat(B.Pos) + new Vector3(Random.Range(-3f, 3f), 0, Random.Range(-3f, 3f)), Random.Range(2f, 4f));
-                        if (k % 6 == 0) G.Hud.WorldText(target + Vector3.up * 1.5f, MathSigns[Random.Range(0, MathSigns.Length - 1)], k % 12 == 0 ? Color.white : ec, 0.9f);
-                    }
-                    G.Cam.Shake(0.08f);
-                });
-            }
-            // 最後の一突き
-            Fx.Later(0.2f + n * gap + 0.12f, () =>
-            {
-                if (G.State != Game.Mode.Battle) return;
-                var fwd = p.Forward;
-                var start = p.Pos + Vector3.up * 1.3f;
-                var target = B.Alive ? B.Pos + Vector3.up * (B.Y + 2.3f) : start + fwd * 6f;
-                PhantomSpear(start - fwd, target + fwd * 3f, Color.white, 2.2f);
-                Fx.Explosion(target, ec, 2f);
-                Fx.Ring(Player.Flat(target), 7f, ec, 0.45f, 3f);
-                Fx.Stars(target, Color.white, 16);
+                float u = Mathf.Clamp01(t / fall);
+                var tg = B.Alive && near ? Player.Flat(B.Pos) : target;
+                go.transform.position = tg + Vector3.up * Mathf.Lerp(22f, 2.2f, u * u);
+                go.transform.Rotate(0, 240 * dt, 0, Space.World);
+                if (Random.value < 0.6f) Fx.Embers(go.transform.position + Random.insideUnitSphere * 1.5f, ec, 1);
+                if (u < 1) return true;
+                // 着弾：ドカンと1発
+                Fx.Explosion(tg + Vector3.up * 1.5f, ec, 2.6f);
+                Fx.Explosion(tg + Vector3.up * 1.5f, Color.white, 1f);
+                Fx.Ring(tg, 8f, ec, 0.5f, 3f);
+                Fx.Stars(tg + Vector3.up * 2, Color.white, 20);
+                Fx.Debris(tg + Vector3.up * 0.5f, new Color(0.8f, 0.95f, 1f, 0.9f), 24);
                 for (int k = 0; k < 8; k++)
                 {
                     float a = k / 8f * Mathf.PI * 2;
-                    Fx.IceSpike(Player.Flat(target) + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 4f, 4.5f);
+                    Fx.IceSpike(tg + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 4f, 3.5f);
                 }
-                G.Hud.WorldText(target + Vector3.up * 2.5f, "Q.E.D.！！", ec, 1.5f);
-                Sfx.Play("freeze", 1f, 1f);
-                Sfx.Play("burstHit", 0.5f, 1.3f);
-                G.Cam.Shake(0.45f);
-                G.Cam.FovPunch(-6);
-                PostFX.I?.Flash(new Color(0.7f, 0.9f, 1f), 0.3f);
-                Fx.HitStop(0.08f);
-                if (B.Alive && Player.Flat(B.Pos - p.Pos).magnitude < Boss.Radius + 5.5f)
+                Sfx.Play("freeze", 1f, 0.9f);
+                Sfx.Play("boom", 0.8f, 1.1f);
+                G.Cam.Shake(0.5f);
+                PostFX.I?.Flash(new Color(0.75f, 0.9f, 1f), 0.3f);
+                Fx.HitStop(0.07f);
+                G.Hud.WorldText(tg + Vector3.up * 5f, "Q.E.D.！", ec, 1.3f);
+                if (B.Alive && Player.Flat(B.Pos - tg).magnitude < Boss.Radius + 3.5f)
                 {
-                    G.DamageBoss(160, Game.HitKind.Skill, target, Elem.Ice);
-                    G.SpawnOrbs(target, 3);
+                    G.DamageBoss(260, Game.HitKind.Skill, B.Pos + Vector3.up * (B.Y + 2.5f), Elem.Ice);
+                    G.SpawnOrbs(B.Pos + Vector3.up * 2.5f, 2);
                 }
-            });
+                return false;
+            }, go);
         }
 
         static Mesh spearHead, spearShaft;
@@ -601,7 +577,7 @@ namespace AndoBoss
         }
 
         // らいと「数学の神・絶対零度の証明」：ボスを凍らせ、数式が舞う中で16連突き →
-        // 天から氷の大槍。凍らせた先生は「証明済み」になり、10秒間ダメージ1.5倍
+        // 天から氷の大槍。凍らせた先生は「証明済み」になり、6秒間ダメージ1.5倍
         public static void RaitoBurst(Player p)
         {
             var ec = p.Def.ElemColor;
@@ -677,9 +653,9 @@ namespace AndoBoss
                 G.Hud.WorldText(B.Pos + Vector3.up * 6.5f, "証明完了！！", ec, 1.6f);
                 Sfx.Play("freeze", 1f, 0.7f);
                 Finale(450, Elem.Ice);
-                // ここから10秒間「証明済み」：受けるダメージ1.5倍
-                B.ProvenT = 10f;
-                G.Hud.Banner("証明済み！", "10秒間 先生が受けるダメージ1.5倍", ec, 1.6f);
+                // ここから6秒間「証明済み」：受けるダメージ1.5倍
+                B.ProvenT = 6f;
+                G.Hud.Banner("証明済み！", "6秒間 先生が受けるダメージ1.5倍", ec, 1.6f);
             });
         }
 

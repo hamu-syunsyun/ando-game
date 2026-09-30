@@ -9,7 +9,7 @@ namespace AndoBoss
     {
         public float MaxHp => Def.MaxHp * Game.PlayerHpMul; // 難易度で増える
         public const float DodgeCost = 20f; // 回避1回のスタミナ（前は 25）
-        public float SkillCdMax => Def.SkillCd * 0.75f; // 特技のクールタイムは全員 25% 短く
+        public float SkillCdMax => Def.SkillCd; // 特技のクールタイム
         public CharDef Def;
 
         // 状態（HPとスタミナはパーティ共通なので Game が持つ）
@@ -204,7 +204,7 @@ namespace AndoBoss
         public void ResetState()
         {
             Pos = new Vector3(0, 0, -9);
-            Vy = 0; Face = 0; Inv = 0; Dodge = 0; SkillCd = 0; Energy = 60;
+            Vy = 0; Face = 0; Inv = 0; Dodge = 0; SkillCd = 0; Energy = 40;
             HurtT = 0; BuffT = 0; BurstT = 0; DeadT = 0; OnGround = true; Dead = false; Victory = false; SwapInT = 0; LockT = 0; knock = Vector3.zero;
             swing = null; comboIdx = 0; comboTimer = 0; queued = false; elemIcd = 0; ShootT = 0; ShootUp = false; ThrustT = 0;
             transform.position = Pos;
@@ -359,7 +359,7 @@ namespace AndoBoss
             SwapInT = Mathf.Max(0, SwapInT - dt);
             LockT = Mathf.Max(0, LockT - dt);
             elemIcd = Mathf.Max(0, elemIcd - dt);
-            if (G.State == Game.Mode.Battle && !Dead) Energy = Mathf.Min(100, Energy + dt * 1.2f);
+            if (G.State == Game.Mode.Battle && !Dead) Energy = Mathf.Min(100, Energy + dt * 0.6f);
 
             Vy -= 26 * dt;
             Pos.y += Vy * dt;

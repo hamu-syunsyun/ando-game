@@ -58,8 +58,8 @@ namespace AndoBoss
             {
                 Id = 3, Name = "らいと", Title = "自称・数学の神", Elem = Elem.Ice, Weapon = Weapon.Spear, MaxHp = 1300f, AtkMul = 1.3f, Height = 1.02f,
                 SwingDmg = new[] { 34f, 38, 52, 60, 115 }, SwingDur = new[] { 0.27f, 0.27f, 0.33f, 0.33f, 0.6f },
-                SkillCd = 8f, SkillName = "無限連突き", BurstName = "数学の神・絶対零度の証明", BurstShout = "ぼくは数学の神だよ！",
-                Passive = "天才：会心率がいつも15%アップ。奥義で凍らせた先生は「証明済み」になり、10秒間ダメージ1.5倍",
+                SkillCd = 8f, SkillName = "証明終了（氷塊落とし）", BurstName = "数学の神・絶対零度の証明", BurstShout = "ぼくは数学の神だよ！",
+                Passive = "天才：会心率がいつも10%アップ。奥義で凍らせた先生は「証明済み」になり、6秒間ダメージ1.5倍",
                 Hair = new Color(0.16f, 0.16f, 0.2f), Jacket = new Color(0.2f, 0.3f, 0.45f), Pants = new Color(0.14f, 0.15f, 0.22f),
                 Accent = new Color(0.6f, 0.88f, 1f), Eye = new Color(0.35f, 0.65f, 0.95f), Skin = new Color(1f, 0.88f, 0.78f),
             },

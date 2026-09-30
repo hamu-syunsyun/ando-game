@@ -43,7 +43,7 @@ namespace AndoBoss
         float drinkT;
         // 難しさの調整：ボスの攻撃の強さ・こちらの攻撃の強さ
         public float EnemyDmgMul = 1.4f; // 難易度で変わる（ResetRound で設定）
-        public const float PlayerDmgMul = 1.1f; // 全員の攻撃力（前は 0.85）
+        public const float PlayerDmgMul = 0.85f; // 全員の攻撃力
         float comboT, stateT, titleOrbit, swapCd;
         bool paused;
         public bool Cinematic;
@@ -124,7 +124,7 @@ namespace AndoBoss
             Fx.ClearAll();
             foreach (var o in FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
             EnemyDmgMul = DiffDmg[Difficulty];
-            PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(12f, 17f);
+            PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(15f, 22f);
             foreach (var d in FindObjectsByType<Drink>(FindObjectsSortMode.None)) Destroy(d.gameObject);
             foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
             active = StartChar;
@@ -475,7 +475,7 @@ namespace AndoBoss
             drinkT -= dt;
             if (drinkT <= 0)
             {
-                drinkT = Random.Range(14f, 20f);
+                drinkT = Random.Range(18f, 26f);
                 if (FindObjectsByType<Drink>(FindObjectsSortMode.None).Length < 2) Drink.Spawn();
             }
 
@@ -582,7 +582,7 @@ namespace AndoBoss
         {
             var B = Boss; var P = Player;
             if (State != Mode.Battle || !B.Alive) return;
-            float critRate = (P.BuffT > 0 ? 0.6f : 0.18f) + (P.Def.Weapon == Weapon.Spear ? 0.15f : 0f); // らいとの能力「天才」
+            float critRate = (P.BuffT > 0 ? 0.6f : 0.18f) + (P.Def.Weapon == Weapon.Spear ? 0.1f : 0f); // らいとの能力「天才」
             bool crit = Random.value < critRate;
             float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * (B.DefDownT > 0 ? 1.3f : 1f) * (B.ProvenT > 0 ? 1.5f : 1f) * Random.Range(0.9f, 1.1f);
 
@@ -636,7 +636,7 @@ namespace AndoBoss
 
             if (kind == HitKind.Normal)
             {
-                P.Energy = Mathf.Min(100, P.Energy + 1.5f);
+                P.Energy = Mathf.Min(100, P.Energy + 1);
                 if (Random.value < 0.2f) SpawnOrbs(hitPos, 1);
             }
             if (B.Hp <= 0)
@@ -715,7 +715,7 @@ namespace AndoBoss
             }
             if (Player.Def.Weapon == Weapon.Spear && !canceled) Fx.Later(0.5f, () => Say("ぼくてんさいだから！", 1.6f, Player.Def.Name));
             Player.BuffT = 5f;
-            Player.Energy = Mathf.Min(100, Player.Energy + 20);
+            Player.Energy = Mathf.Min(100, Player.Energy + 15);
             Fx.Slow(0.22f, 0.9f);
             Hud.Perfect();
             Hud.Banner("ジャスト回避！", "5秒間 会心率アップ", new Color(0.6f, 0.95f, 1f), 1.0f);
@@ -820,7 +820,7 @@ namespace AndoBoss
         {
             // 出ているキャラは多め、控えのキャラも少したまる
             for (int i = 0; i < Party.Length; i++)
-                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 6 : 3));
+                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 4 : 2));
             Sfx.Play("orb", 0.5f, 0.9f + Player.Energy / 300f);
             Fx.Sparks(Player.Pos + Vector3.up, Player.Def.ElemColor, 6, 0.5f);
         }
