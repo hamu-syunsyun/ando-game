@@ -110,6 +110,7 @@ namespace AndoBoss
             Mat.Part(root, Mat.Frustum(1, 1, 1, 96, false, true), wallMat, new Vector3(0, 1.5f, 0), new Vector3(ArenaR + 1.3f, 3f, ArenaR + 1.3f), default, false);
 
             // ---- 巨大な電子部品の柱 ----
+            Props.Clear();
             for (int i = 0; i < 9; i++)
             {
                 float a = i / 9f * Mathf.PI * 2 + 0.2f;
@@ -117,6 +118,7 @@ namespace AndoBoss
                 p.SetParent(root, false);
                 p.localPosition = new Vector3(Mathf.Cos(a) * (ArenaR + 6), 0, Mathf.Sin(a) * (ArenaR + 6));
                 p.localRotation = Quaternion.Euler(0, Random.Range(0, 360f), 0);
+                Props.Add(new Vector3(p.localPosition.x, 0, p.localPosition.z));
                 switch (i % 3)
                 {
                     case 0: Resistor(p); break;
@@ -228,6 +230,37 @@ namespace AndoBoss
                 wallMat.SetColor("_Color", new Color(ec.r, ec.g, ec.b, 0.08f + 0.08f * phase2 + 0.03f * Mathf.Sin(time * 2)));
                 wallMat.SetTextureOffset("_MainTex", new Vector2(time * 0.02f, 0));
             }
+        }
+
+        // カメラが柱にめりこまないように使う（柱は半径 PropR・高さ PropH の円柱とみなす）
+        public static readonly List<Vector3> Props = new List<Vector3>();
+        const float PropR = 2.6f, PropH = 11.5f;
+
+        // from（見ている点）から to（カメラを置きたい所）へ線を引き、柱に当たったら手前で止める
+        public static Vector3 CamClip(Vector3 from, Vector3 to)
+        {
+            var d = to - from;
+            float best = 1f;
+            foreach (var c in Props)
+            {
+                // XZ 平面での、線分と円の交わり
+                float ox = from.x - c.x, oz = from.z - c.z;
+                float a = d.x * d.x + d.z * d.z;
+                if (a < 1e-6f) continue;
+                float b = 2 * (ox * d.x + oz * d.z);
+                float cc = ox * ox + oz * oz - PropR * PropR;
+                if (cc < 0) continue; // 見ている点が柱の中なら何もしない
+                float disc = b * b - 4 * a * cc;
+                if (disc < 0) continue;
+                float t = (-b - Mathf.Sqrt(disc)) / (2 * a);
+                if (t < 0 || t > best) continue;
+                float y = from.y + d.y * t;
+                if (y > PropH) continue;
+                best = t;
+            }
+            if (best >= 1f) return to;
+            // 当たったところより少し手前に置く
+            return from + d * Mathf.Max(0.15f, best - 0.4f / Mathf.Max(0.01f, d.magnitude));
         }
 
         // ---- 部品の柱 ----

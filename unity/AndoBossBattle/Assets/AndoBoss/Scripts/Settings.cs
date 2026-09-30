@@ -9,18 +9,27 @@ namespace AndoBoss
         // ---- 難易度 ----
         public static int Difficulty = 1;
         public static readonly string[] DiffNames = { "やさしい", "ふつう", "むずかしい", "鬼" };
-        public static readonly string[] DiffNotes =
+        static readonly string[] DiffBase =
         {
-            "受けるダメージ少なめ・ボスのHP 7割・攻撃の間隔ゆっくり（点数×0.7）",
-            "ふつうの強さ・自分の体力 1.2倍（点数×1.0）",
-            "受けるダメージ多め・ボスのHP 1.15倍・自分の体力 1.45倍（点数×1.2）",
-            "受けるダメージ大・ボスのHP 1.3倍・自分の体力 1.75倍（点数×1.5）",
+            "受けるダメージ少なめ・ボスのHP 7割・攻撃の間隔ゆっくり",
+            "ふつうの強さ",
+            "受けるダメージ多め・ボスのHP 1.15倍",
+            "受けるダメージ大・ボスのHP 1.3倍・休みなく攻撃してくる",
         };
+        // 難易度の説明（自分の体力はダブルかどうかで変わるので、その場で作る）
+        public static string DiffNote(int d)
+        {
+            float hp = (IsDouble ? DiffPlayerHpDouble : DiffPlayerHp)[d];
+            string h = hp > 1.001f ? $"・自分の体力 {hp:0.##}倍" : "";
+            return $"{DiffBase[d]}{h}（点数×{DiffScore[d]:0.0}）";
+        }
         static readonly float[] DiffDmg = { 0.8f, 1.4f, 1.8f, 2.3f };
         static readonly float[] DiffHp = { 0.7f, 1f, 1.15f, 1.3f };
         // 自分（プレイヤー）の体力：難易度を上げるごとに増える（攻撃が激しくなるぶん、耐えられるように）
-        static readonly float[] DiffPlayerHp = { 1f, 1.2f, 1.45f, 1.75f };
-        public static float PlayerHpMul => DiffPlayerHp[Difficulty];
+        static readonly float[] DiffPlayerHp = { 1f, 1.1f, 1.25f, 1.4f };
+        // ダブル（安東＋菅原）のときは2人ぶんの攻撃を受けるので、体力の増え方を多めにする
+        static readonly float[] DiffPlayerHpDouble = { 1f, 1.25f, 1.5f, 1.8f };
+        public static float PlayerHpMul => (IsDouble ? DiffPlayerHpDouble : DiffPlayerHp)[Difficulty];
         static readonly float[] DiffRest = { 1.5f, 1f, 0.85f, 0.7f };
         static readonly float[] DiffScore = { 0.7f, 1f, 1.2f, 1.5f };
         public static float BossHpMul => DiffHp[Difficulty];

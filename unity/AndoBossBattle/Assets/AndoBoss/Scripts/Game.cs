@@ -23,7 +23,7 @@ namespace AndoBoss
         public Hud Hud;
         public Music Music;
 
-        public const float TimeLimit = 210f;
+        public const float TimeLimit = 240f;
         public float TimeLeft;
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
         // 菅原先生のカウント（5つで単位消滅）
@@ -31,7 +31,7 @@ namespace AndoBoss
         public int Counts;
         public static int BossKind; // 0 = 安東先生, 1 = 菅原先生, 2 = ダブル（超ハード）
         public static bool IsDouble => BossKind == 2;
-        public const float DoubleTimeLimit = 270f;
+        public const float DoubleTimeLimit = 300f;
         int KillBonus => IsDouble ? 3000 : 1000;
         int selectStep;             // 0 = ボス選択, 1 = キャラ選択
         // パーティ共通のHP・スタミナ・デバフ
@@ -960,7 +960,7 @@ namespace AndoBoss
     // 空から落ちてくるエナジードリンク。拾うと体力回復
     public class Drink : MonoBehaviour
     {
-        public const float Heal = 400f;
+        public const float Heal = 250f;
         float t, y = 14;
         Vector3 pos;
         Transform can;

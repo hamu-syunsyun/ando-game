@@ -81,6 +81,18 @@ namespace AndoBoss
                 yield return Wait(3f);
                 G.PartyHp = G.Player.MaxHp; G.Counts = 0;
             }
+            // カメラが柱にめりこまないかの確認：アリーナのふち、LEDの柱の前に立つ
+            {
+                var P = G.Player;
+                var led = World.Props[2];
+                var dir = led.normalized;
+                P.Pos = dir * (World.ArenaR - 0.8f);
+                G.Cam.Yaw = Mathf.Atan2(-dir.x, -dir.z);
+                G.Cam.Pitch = 0.25f;
+                yield return Wait(0.6f);
+                yield return ShotCo("046_camclip");
+                P.Pos = new Vector3(0, 0, -9);
+            }
             for (int i = 0; i < 12; i++)
             {
                 G.DamageBoss(60, Game.HitKind.Normal, G.Boss.Pos + Vector3.up * 2.5f);

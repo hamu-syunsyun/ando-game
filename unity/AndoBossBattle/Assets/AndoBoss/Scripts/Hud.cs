@@ -673,7 +673,7 @@ namespace AndoBoss
                 else { row.label.text = "もどる"; row.value.text = "決定でタイトルへ"; }
             }
             int sr = G.SetRow;
-            setNote.text = sr == Game.RowDiff ? Game.DiffNotes[Game.Difficulty]
+            setNote.text = sr == Game.RowDiff ? Game.DiffNote(Game.Difficulty)
                 : sr == Game.RowPreset ? "組み込みの4種類と、自分で登録した「マイ設定」3つから選べます"
                 : sr == Game.RowRegister ? "今の割り当てを名前つき（マイ設定1〜3）で保存します。あとで「プリセット」から呼び出せます"
                 : sr >= Game.RowAct0 && sr < Game.RowRegister
@@ -977,7 +977,7 @@ namespace AndoBoss
             {
                 bossT += dt;
                 var dc = new[] { new Color(0.55f, 1f, 0.7f), Color.white, new Color(1f, 0.7f, 0.4f), new Color(1f, 0.35f, 0.4f) }[Game.Difficulty];
-                bossDiff.text = $"難易度：<color=#{ColorUtility.ToHtmlStringRGB(dc)}>◀ {Game.DiffNames[Game.Difficulty]} ▶</color>　<size=22>{Game.DiffNotes[Game.Difficulty]}</size>";
+                bossDiff.text = $"難易度：<color=#{ColorUtility.ToHtmlStringRGB(dc)}>◀ {Game.DiffNames[Game.Difficulty]} ▶</color>　<size=22>{Game.DiffNote(Game.Difficulty)}</size>";
                 bossHelp.text = GameInput.UsingPad
                     ? $"十字キー ← → で先生、↑ ↓ で難易度　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} でタイトルへ"
                     : "← → か 1・2・3 で先生、↑ ↓ で難易度　／　Enter・クリックで決定　／　BS でタイトルへ";

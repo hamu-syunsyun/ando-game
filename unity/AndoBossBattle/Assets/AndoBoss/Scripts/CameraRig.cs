@@ -107,6 +107,8 @@ namespace AndoBoss
             float e = cineBlend * cineBlend * (3 - 2 * cineBlend);
             pos = Vector3.Lerp(pos, cinePos, e);
             look = Vector3.Lerp(look, cineLook, e);
+            // 電子部品の柱にカメラがめりこまないようにする
+            pos = World.CamClip(look, pos);
 
             fovPunch = Mathf.Lerp(fovPunch, 0, dt * 6);
             Cam.fieldOfView = Mathf.Lerp(BaseFov, cineFov, e) + fovPunch;
