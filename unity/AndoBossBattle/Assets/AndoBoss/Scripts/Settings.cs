@@ -26,7 +26,7 @@ namespace AndoBoss
         static readonly float[] DiffDmg = { 0.8f, 1.4f, 1.8f, 2.3f };
         static readonly float[] DiffHp = { 0.7f, 1f, 1.15f, 1.3f };
         // 自分（プレイヤー）の体力：難易度を上げるごとに増える（攻撃が激しくなるぶん、耐えられるように）
-        static readonly float[] DiffPlayerHp = { 1f, 1.1f, 1.25f, 1.4f };
+        static readonly float[] DiffPlayerHp = { 1f, 1.1f, 1.2f, 1.3f };
         // ダブル（安東＋菅原）のときは2人ぶんの攻撃を受けるので、体力の増え方を多めにする
         static readonly float[] DiffPlayerHpDouble = { 1f, 1.25f, 1.5f, 1.8f };
         public static float PlayerHpMul => (IsDouble ? DiffPlayerHpDouble : DiffPlayerHp)[Difficulty];
