@@ -22,6 +22,11 @@ namespace AndoBoss
         public const float TimeLimit = 210f;
         public float TimeLeft;
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
+        // 菅原先生のカウント（5つで単位消滅）
+        public const int MaxCount = 5;
+        public int Counts;
+        public static int BossKind; // 0 = 安東先生, 1 = 菅原先生
+        int selectStep;             // 0 = ボス選択, 1 = キャラ選択
         // パーティ共通のHP・スタミナ・デバフ
         public const float MaxStam = 150f;
         public float PartyHp = 1000f, PartyStam = MaxStam, StamDelay, SlowT;
@@ -36,7 +41,7 @@ namespace AndoBoss
         public bool Cinematic;
         bool win; string loseReason;
         bool energyAnnounced;
-        const string BestKey = "ando_boss_best";
+        string BestKey => BossKind == 1 ? "suga_boss_best" : "ando_boss_best";
 
         // 画風：0 = アニメ調, 1 = リアル調（F3 で切り替え）
         public static int Style = 0;
@@ -92,6 +97,7 @@ namespace AndoBoss
 
             ResetRound();
             GoTitle();
+            ShotTour.StartIfRequested(this);
         }
 
         // ================= 場面の切り替え =================
@@ -112,13 +118,16 @@ namespace AndoBoss
             comboT = 0;
             energyAnnounced = false;
             Cinematic = false;
-            Sky.SetStorm(0);
+            Sky.SetStorm(BossKind == 1 ? 0.35f : 0);
+            Counts = 0;
             if (PostFX.I) { PostFX.I.Desaturate(0); PostFX.I.SetTint(Color.white); PostFX.I.LowHp = 0; }
             Music.Duck(false);
             Music.SetMuffled(false);
+            Music.SetPitch(BossKind == 1 ? 0.94f : 1f);
+            if (Boss.Kind != BossKind) Boss.SetKind(BossKind);
         }
 
-        void GoTitle()
+        internal void GoTitle()
         {
             ResetRound();
             State = Mode.Title; stateT = 0;
@@ -129,9 +138,18 @@ namespace AndoBoss
         }
 
         // ---- キャラ選択 ----
-        void GoSelect()
+        internal void GoSelect()
         {
             State = Mode.Select; stateT = 0;
+            selectStep = 0;
+            Sfx.Play("confirm", 0.8f);
+            Hud.ShowBossSelect(BossKind);
+        }
+
+        // ボスを選んだあと、キャラ選択へ
+        internal void GoCharSelect()
+        {
+            selectStep = 1; stateT = 0;
             Sfx.Play("confirm", 0.8f);
             for (int i = 0; i < Party.Length; i++)
             {
@@ -146,6 +164,7 @@ namespace AndoBoss
 
         void UpdateSelect()
         {
+            if (selectStep == 0) { UpdateBossSelect(); return; }
             int before = StartChar;
             if (GameInput.Down(GameInput.K.Left)) StartChar = (StartChar + Party.Length - 1) % Party.Length;
             if (GameInput.Down(GameInput.K.Right)) StartChar = (StartChar + 1) % Party.Length;
@@ -157,7 +176,7 @@ namespace AndoBoss
                 Hud.ShowSelect(StartChar);
             }
             var sel = Party[StartChar];
-            Cam.Cinematic(sel.Pos + new Vector3(0.8f, 1.9f, -4.2f), sel.Pos + Vector3.up * 1.3f, 40, stateT < 0.05f);
+            Cam.Cinematic(sel.Pos + new Vector3(0.6f, 1.2f, -5.2f), sel.Pos + Vector3.up * 0.35f, 40, stateT < 0.05f); // カードに隠れないよう、キャラを画面の上半分に
             for (int i = 0; i < Party.Length; i++)
             {
                 var p = Party[i];
@@ -166,10 +185,39 @@ namespace AndoBoss
             }
             Boss.Tick(Time.deltaTime);
             if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoIntro();
-            if (GameInput.Down(GameInput.K.Title)) GoTitle();
+            if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoSelect();
         }
 
-        void GoIntro()
+        internal void SelectBoss(int k)
+        {
+            BossKind = k;
+            Boss.SetKind(BossKind);
+            Boss.Face = Mathf.PI;
+            Sky.SetStorm(BossKind == 1 ? 0.35f : 0);
+            Music.SetPitch(BossKind == 1 ? 0.94f : 1f);
+            Hud.ShowBossSelect(BossKind);
+        }
+
+        void UpdateBossSelect()
+        {
+            int before = BossKind;
+            if (GameInput.Down(GameInput.K.Left) || GameInput.Down(GameInput.K.Right)) BossKind = 1 - BossKind;
+            if (GameInput.Down(GameInput.K.Char1)) BossKind = 0;
+            if (GameInput.Down(GameInput.K.Char2)) BossKind = 1;
+            if (before != BossKind)
+            {
+                Sfx.Play("swap", 0.6f, 0.9f);
+                SelectBoss(BossKind);
+            }
+            var bp = Boss.Pos;
+            Cam.Cinematic(bp + new Vector3(2.6f, 3.4f, -13.5f), bp + Vector3.up * 2.3f, 40, stateT < 0.05f);
+            Boss.Tick(Time.deltaTime);
+            TickParty(Time.deltaTime);
+            if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoCharSelect();
+            if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoTitle();
+        }
+
+        internal void GoIntro()
         {
             ResetRound();
             State = Mode.Intro; stateT = 0;
@@ -178,11 +226,11 @@ namespace AndoBoss
             Sfx.Play("confirm", 0.8f);
             Sfx.Play("roar", 0.6f, 1.2f);
             Music.Mix(0, 0.9f, 0.9f, 0, 0.6f);
-            Say("……おめ、おれがら単位取るつもりだが？", 2.8f);
+            Say(Boss.Line("intro"), 2.8f);
             LockCursor();
         }
 
-        void GoBattle()
+        internal void GoBattle()
         {
             State = Mode.Battle; stateT = 0;
             Cam.EndCinematic();
@@ -393,7 +441,45 @@ namespace AndoBoss
         }
 
         // ================= 戦闘のできごと =================
-        public void Say(string text, float sec = 2.6f, string speaker = "安東先生") => Hud.Say(text, sec, speaker);
+        public void Say(string text, float sec = 2.6f, string speaker = null)
+        {
+            speaker ??= Boss.Name;
+            bool raspy = speaker == "菅原先生";
+            Hud.Say(text, sec, speaker, raspy);
+            // 菅原先生の声はかすかす（ささやくような声の効果音）
+            if (raspy) Sfx.Play("whisper" + Random.Range(0, 3), 0.9f, 1f, 0.06f);
+        }
+
+        // 菅原先生の攻撃に当たるとカウントがたまる。5つで単位消滅
+        public void AddCount(int n)
+        {
+            if (State != Mode.Battle || !Boss.IsSuga) return;
+            Counts = Mathf.Min(MaxCount, Counts + n);
+            Hud.CountPop();
+            Sfx.Play("stamp", 1f, 0.7f);
+            Sfx.Play("count", 0.9f);
+            Cam.Shake(0.4f);
+            PostFX.I?.Flash(new Color(0.8f, 0.1f, 0.2f), 0.3f);
+            if (Counts >= MaxCount)
+            {
+                Hud.Banner("カウント5", "単位消滅", new Color(1f, 0.25f, 0.3f), 2.4f);
+                Say(Boss.Line("count5"), 3.5f);
+                Lose("単位消滅…");
+                return;
+            }
+            Hud.Banner($"カウント {Counts}", Counts == MaxCount - 1 ? "リーチ！あと1つで単位消滅" : $"あと{MaxCount - Counts}つで単位消滅", new Color(1f, 0.3f, 0.35f), 1.1f);
+            string[] says = { "", "はい、カウント1。", "カウント2。", "あと2つで単位なくなるよ？", "……リーチだね。" };
+            Say(says[Counts], 2.2f);
+        }
+
+        public void OnHakai()
+        {
+            Hud.Banner("北の破壊神", "空から落ちる破壊の柱と衝撃波に注意！", new Color(0.7f, 0.4f, 1f), 1.8f);
+            Sky.SetStorm(1);
+            Sky.Flash(1f);
+            Cam.Shake(0.6f);
+            Sfx.Play("roar", 0.9f, 0.7f);
+        }
 
         // light = 多段ヒットの細かい1発（ヒットストップと効果音を軽くする）
         public void DamageBoss(float baseDmg, HitKind kind, Vector3 hitPos, Elem elem = Elem.None, bool light = false)
@@ -487,6 +573,14 @@ namespace AndoBoss
         public void PerfectDodge()
         {
             Perfects++;
+            if (Boss.IsSuga && Counts > 0)
+            {
+                // ジャスト回避でカウントを1つ取り消せる
+                Counts--;
+                Hud.CountPop();
+                Fx.Later(0.6f, () => Hud.Banner("カウント取り消し！", $"残りカウント {Counts}", new Color(0.6f, 0.95f, 1f), 1.0f));
+                Say("……今のは、ノーカウント。", 1.8f);
+            }
             Player.BuffT = 5f;
             Player.Energy = Mathf.Min(100, Player.Energy + 15);
             Fx.Slow(0.22f, 0.9f);
@@ -511,12 +605,12 @@ namespace AndoBoss
             Fx.Stars(Boss.HeadPos, Mat.Gold, 30);
             Fx.Sparks(Boss.Pos + Vector3.up * 2.5f, Mat.Gold, 40, 1.6f);
             Fx.Ring(Boss.Pos, 8, Mat.Gold, 0.5f, 3f);
-            Say("な……おれの理論が……！", 2f);
+            Say(Boss.Line("break"), 2f);
         }
 
         public void OnPhase2()
         {
-            Hud.Banner("本気モード", "安東先生の攻撃が激しくなった！", new Color(1f, 0.5f, 0.85f), 2f);
+            Hud.Banner("本気モード", Boss.IsSuga ? "菅原先生の攻撃が激しくなった！「北の破壊神」に注意" : "安東先生の攻撃が激しくなった！", new Color(1f, 0.5f, 0.85f), 2f);
             Sky.SetStorm(1);
             Music.SetBattle(true);
             Sfx.Play("roar", 1f);
@@ -598,7 +692,7 @@ namespace AndoBoss
         }
 
         // ================= 決着 =================
-        void Win()
+        internal void Win()
         {
             if (State != Mode.Battle) return;
             State = Mode.Ending; stateT = 0; win = true;
@@ -606,7 +700,7 @@ namespace AndoBoss
             Player.Victory = true;
             Cinematic = true;
             Hud.Letterbox(true);
-            Say("……しかたねな。単位、認めるべ。", 4.5f);
+            Say(Boss.Line("win"), 4.5f);
             int bonus = 1000 + Mathf.CeilToInt(TimeLeft) * 20 + Mathf.RoundToInt(PartyHp);
             Hud.Banner("撃破！", $"撃破ボーナス +{bonus}", Mat.Gold, 2.6f);
             Fx.Slow(0.15f, 1.4f);
@@ -640,7 +734,7 @@ namespace AndoBoss
             State = Mode.Ending; stateT = 0; win = false; loseReason = reason;
             Cinematic = true;
             Hud.Letterbox(true);
-            Say(reason == "時間切れ…" ? "時間だ。答案、回収するど。" : "へば、また来年な。", 3.5f);
+            if (reason != "単位消滅…") Say(reason == "時間切れ…" ? Boss.Line("timeup") : Boss.Line("lose"), 3.5f);
             Hud.Banner(reason, "", new Color(0.75f, 0.8f, 1f), 2.2f);
             Fx.Slow(0.3f, 1.2f);
             PostFX.I?.Desaturate(0.75f);
@@ -687,7 +781,7 @@ namespace AndoBoss
             Fx.Later(0.9f, () => { if (State == Mode.Battle) Skills.RyunenShot(Player); });
         }
 
-        void ShowResult()
+        internal void ShowResult()
         {
             State = Mode.Result; stateT = 0;
             Hud.Letterbox(false);

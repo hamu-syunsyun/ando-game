@@ -32,6 +32,7 @@ namespace AndoBoss.EditorTools
             if (EditorUtility.DisplayDialog("ベストスコアを消す", "このPCに保存されているベストスコアを消します。よろしいですか？", "消す", "やめる"))
             {
                 PlayerPrefs.DeleteKey("ando_boss_best");
+                PlayerPrefs.DeleteKey("suga_boss_best");
                 PlayerPrefs.Save();
             }
         }

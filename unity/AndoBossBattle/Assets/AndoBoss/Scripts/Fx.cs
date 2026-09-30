@@ -438,7 +438,7 @@ namespace AndoBoss
             I.jobs.Clear(); I.adding.Clear(); I.timers.Clear();
             foreach (var ps in new[] { I.sparks, I.glow, I.debris, I.confetti, I.stars, I.embers }) ps.Clear();
             foreach (var t in GameObject.FindObjectsByType<Transform>(FindObjectsSortMode.None))
-                if (t && t.parent == null && (t.name == "tele" || t.name == "teleband" || t.name == "bullet" || t.name == "orb" || t.name == "beam" || t.name == "arrow" || t.name == "rugby" || t.name == "report")) Kill(t.gameObject);
+                if (t && t.parent == null && (t.name == "tele" || t.name == "teleband" || t.name == "bullet" || t.name == "orb" || t.name == "beam" || t.name == "arrow" || t.name == "rugby" || t.name == "report" || t.name == "letter" || t.name == "ewall")) Kill(t.gameObject);
             I.hitStop = 0; I.slowT = 0; I.slowScale = 1;
         }
 

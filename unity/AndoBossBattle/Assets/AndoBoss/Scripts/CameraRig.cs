@@ -62,6 +62,12 @@ namespace AndoBoss
                 Yaw += md.x * 0.045f;
                 Pitch = Mathf.Clamp(Pitch - md.y * 0.03f, -0.2f, 1.1f);
             }
+            // コントローラーの右スティックでも視点を回せる
+            if (G.State == Game.Mode.Battle && !Fx.I.Paused)
+            {
+                var ls = GameInput.LookStick();
+                if (ls.sqrMagnitude > 0) { mouseIdle = 0; Yaw += ls.x * 2.6f * dt; Pitch = Mathf.Clamp(Pitch - ls.y * 1.5f * dt, -0.2f, 1.1f); }
+            }
             mouseIdle += dt;
             if (GameInput.Down(GameInput.K.LockOn) && G.State == Game.Mode.Battle)
             {

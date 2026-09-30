@@ -24,24 +24,33 @@ namespace AndoBoss.EditorTools
             else EditorUtility.DisplayDialog("安東ボス戦", "ビルドに失敗しました。Console のエラーを見てください。", "OK");
         }
 
+        // 動作確認用の Linux 版（スクリーンショットを撮るのに使う）
+        public static void BuildLinux()
+        {
+            var report = Build(BuildTarget.StandaloneLinux64, "Builds/Linux/AndoBossBattle.x86_64");
+            EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);
+        }
+
         public static void BuildWindows()
         {
             var report = Build();
             EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);
         }
 
-        static BuildReport Build()
+        static BuildReport Build() => Build(BuildTarget.StandaloneWindows64, Path.Combine(OutDir, ExeName));
+
+        static BuildReport Build(BuildTarget target, string path)
         {
             AndoBossSetup.EnsureScene();
             // 使っていないライブラリのコードを削って、配りやすい大きさにする
             PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedStrippingLevel.Medium);
             PlayerSettings.usePlayerLog = true;
-            Directory.CreateDirectory(OutDir);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
             var opts = new BuildPlayerOptions
             {
                 scenes = new[] { "Assets/AndoBoss/Scenes/BossBattle.unity" },
-                locationPathName = Path.Combine(OutDir, ExeName),
-                target = BuildTarget.StandaloneWindows64,
+                locationPathName = path,
+                target = target,
                 options = BuildOptions.None,
             };
             var report = BuildPipeline.BuildPlayer(opts);

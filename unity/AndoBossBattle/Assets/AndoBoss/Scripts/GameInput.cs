@@ -1,15 +1,15 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
 namespace AndoBoss
 {
-    // キーボードとマウスの入力をまとめる。
-    // 旧 Input Manager が使えるならそれを使い、新 Input System だけのプロジェクトでも動くようにしてある。
-    public static class GameInput
+    // キーボード・マウス・コントローラー（Xbox / PS）の入力をまとめる。
+    // キーボードとマウスは旧 Input Manager、コントローラーは新 Input System で読む（両方有効の設定）
+    public static partial class GameInput
     {
-        public enum K { Up, Down, Left, Right, Attack, Skill, Burst, Dodge, Jump, Confirm, Pause, Retry, Title, Mute, LockOn, Char1, Char2, Char3, Light, Style }
+        public enum K { Up, Down, Left, Right, Attack, Skill, Burst, Dodge, Jump, Confirm, Pause, Retry, Title, Mute, LockOn, Char1, Char2, Char3, Light, Style, Back }
 
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
         static bool Any(params Key[] ks)
@@ -28,7 +28,7 @@ namespace AndoBoss
         }
         static Mouse M => Mouse.current;
 
-        public static bool Held(K k)
+        static bool KbHeld(K k)
         {
             switch (k)
             {
@@ -41,7 +41,7 @@ namespace AndoBoss
             return false;
         }
 
-        public static bool Down(K k)
+        static bool KbDown(K k)
         {
             switch (k)
             {
@@ -63,11 +63,12 @@ namespace AndoBoss
                 case K.Char3: return AnyDown(Key.Digit3, Key.Numpad3);
                 case K.Light: return AnyDown(Key.F2);
                 case K.Style: return AnyDown(Key.F3);
+                case K.Back: return AnyDown(Key.Backspace);
             }
             return false;
         }
 
-        public static Vector2 MouseDelta()
+        static Vector2 KbMouseDelta()
         {
             if (M == null) return Vector2.zero;
             return M.delta.ReadValue() * 0.05f;
@@ -84,7 +85,7 @@ namespace AndoBoss
             return false;
         }
 
-        public static bool Held(K k)
+        static bool KbHeld(K k)
         {
             switch (k)
             {
@@ -97,7 +98,7 @@ namespace AndoBoss
             return false;
         }
 
-        public static bool Down(K k)
+        static bool KbDown(K k)
         {
             switch (k)
             {
@@ -119,25 +120,34 @@ namespace AndoBoss
                 case K.Char3: return AnyDown(KeyCode.Alpha3, KeyCode.Keypad3);
                 case K.Light: return AnyDown(KeyCode.F2);
                 case K.Style: return AnyDown(KeyCode.F3);
+                case K.Back: return AnyDown(KeyCode.Backspace);
             }
             return false;
         }
 
-        public static Vector2 MouseDelta()
+        static Vector2 KbMouseDelta()
         {
             return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
         }
 #endif
 
-        // カメラ基準の移動方向（XZ 平面、長さ 0 か 1）
+        public static bool Held(K k) => KbHeld(k) || PadHeld(k);
+        public static bool Down(K k) => KbDown(k) || PadDown(k);
+        public static Vector2 MouseDelta() => KbMouseDelta();
+
+        // カメラ基準の移動方向（XZ 平面、長さ 0〜1）。スティックを少し倒すとゆっくり歩く
         public static Vector3 MoveVector(float camYaw)
         {
-            float fz = (Held(K.Up) ? 1 : 0) - (Held(K.Down) ? 1 : 0);
-            float rx = (Held(K.Right) ? 1 : 0) - (Held(K.Left) ? 1 : 0);
+            float fz = (KbHeld(K.Up) ? 1 : 0) - (KbHeld(K.Down) ? 1 : 0);
+            float rx = (KbHeld(K.Right) ? 1 : 0) - (KbHeld(K.Left) ? 1 : 0);
+            var stick = PadMove();
+            if (stick.sqrMagnitude > 0) { rx = stick.x; fz = stick.y; }
             var fwd = new Vector3(Mathf.Sin(camYaw), 0, Mathf.Cos(camYaw));
             var right = new Vector3(fwd.z, 0, -fwd.x);
             var v = fwd * fz + right * rx;
-            return v.sqrMagnitude > 0 ? v.normalized : Vector3.zero;
+            if (v.sqrMagnitude > 1) v.Normalize();
+            if (stick.sqrMagnitude == 0 && v.sqrMagnitude > 0) v.Normalize();
+            return v;
         }
     }
 }

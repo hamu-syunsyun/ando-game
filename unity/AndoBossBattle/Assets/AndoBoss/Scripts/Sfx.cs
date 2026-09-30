@@ -201,6 +201,49 @@ namespace AndoBoss
                 Add("drink", b, 0.7f);
             }
 
+            // ---- 菅原先生の声：かすれたささやき声（息の音を母音のように響かせ、ガラガラした低いうなりを混ぜる） ----
+            {
+                float[,] vowels = { { 750, 1200 }, { 300, 2300 }, { 350, 1300 }, { 500, 1900 }, { 480, 850 } }; // あいうえお
+                for (int k = 0; k < 3; k++)
+                {
+                    float len = 1.3f + k * 0.3f;
+                    var b = Buffer(len);
+                    var f1 = new SVF(); var f2 = new SVF(); var hp = new SVF();
+                    float syl = 0.13f + k * 0.01f;
+                    int v = k; double ph = 0;
+                    for (int i = 0; i < b.Length; i++)
+                    {
+                        float t = i / (float)SR;
+                        int sIdx = (int)(t / syl);
+                        float st = t - sIdx * syl;
+                        if (st < 1f / SR * 2) v = (v * 7 + sIdx * 3 + k) % 5;
+                        float env = Mathf.Sin(Mathf.Clamp01(st / syl) * Mathf.PI);
+                        env *= 0.6f + 0.4f * Mathf.Sin(sIdx * 1.7f + k);
+                        // ガラガラ：低い周期でパルス状に息が途切れる（声のかすれ）
+                        ph += (38 + 8 * Sin(t * 3)) / SR;
+                        float fry = Mathf.Pow(Mathf.Max(0, Saw(ph)), 6) * 1.5f + 0.35f;
+                        float n = rng.Noise() * fry;
+                        f1.Run(n, vowels[v, 0], 5f); f2.Run(n, vowels[v, 1], 6f); hp.Run(n, 4500, 0.7f);
+                        b[i] = (f1.Band * 1.2f + f2.Band * 0.9f + hp.High * 0.15f) * env * Mathf.Clamp01((len - t) * 5);
+                    }
+                    Reverb(b, 0.7f, 0.12f);
+                    Add("whisper" + k, b, 0.55f);
+                }
+            }
+            // カウントがつく音：重い判子＋鎖のようなジャラッとした音
+            {
+                var b = Impact(0.9f, 120, 45, 0.15f, 700, 0.06f, 2f);
+                var bp = new SVF();
+                for (int i = 0; i < SR * 0.35f; i++)
+                {
+                    float t = i / (float)SR;
+                    bp.Run(rng.Noise() * (rng.Next() < 0.08f ? 3 : 0.3f), 1500, 3);
+                    b[i + (int)(0.05f * SR)] += bp.Band * Env(t, 0.005f, 0.12f) * 0.8f;
+                }
+                Reverb(b, 1.4f, 0.35f);
+                Add("count", b, 0.85f);
+            }
+
             // ---- 炎（杉山くん）----
             {
                 var b = Buffer(1.1f);

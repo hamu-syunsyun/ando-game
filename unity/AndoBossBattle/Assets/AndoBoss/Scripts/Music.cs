@@ -76,6 +76,7 @@ namespace AndoBoss
                 s.playOnAwake = false;
                 s.volume = 0;
                 s.spatialBlend = 0;
+                s.pitch = pitch;
                 s.PlayScheduled(start);
                 lowpass[i] = go.AddComponent<AudioLowPassFilter>();
                 lowpass[i].cutoffFrequency = 22000;
@@ -91,6 +92,13 @@ namespace AndoBoss
         }
         public void SetTitle() { Mix(0, 0.5f, 0.9f, 0, 0); lpTarget = 22000; duckTarget = 1; }
         public void SetBattle(bool phase2) { Mix(0.85f, 1, 0.85f, 0.95f, phase2 ? 1 : 0); lpTarget = 22000; duckTarget = 1; }
+        // 曲の高さを変える（菅原先生のときは少し低く暗い感じにする）。全パートそろえて変えるのでずれない
+        float pitch = 1f;
+        public void SetPitch(float p)
+        {
+            pitch = p;
+            foreach (var s in src) if (s) s.pitch = p;
+        }
         public void SetMuffled(bool on) { lpTarget = on ? 700 : 22000; }
         public void Duck(bool on) { duckTarget = on ? 0.25f : 1f; }
         public void StopAll() { Mix(0, 0, 0, 0, 0); }

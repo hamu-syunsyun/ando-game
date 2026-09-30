@@ -7,9 +7,17 @@ namespace AndoBoss
     // 画面のUI。uGUI をコードだけで組み立てる
     public class Hud : MonoBehaviour
     {
-        Font uiFont, bigFont;
+        Font uiFont, bigFont, raspyFont;
+        Material raspyMat;
+        public Font BigFont => bigFont;
         Canvas canvas;
-        RectTransform root, battle, title, result, intro, pause, cutin, select;
+        RectTransform root, battle, title, result, intro, pause, cutin, select, bossSel;
+        readonly List<(RectTransform rt, Image bg, Image border)> bossCards = new List<(RectTransform, Image, Image)>();
+        int bossIdx; float bossT;
+        // 菅原先生のカウント表示
+        readonly List<Image> countSlots = new List<Image>();
+        RectTransform countRt; CanvasGroup countGroup; float countPop;
+        bool raspy; Vector2 subBase;
         readonly List<(RectTransform rt, Image bg, Image border)> selCards = new List<(RectTransform, Image, Image)>();
         int selIdx; float selT;
 
@@ -44,6 +52,7 @@ namespace AndoBoss
         // リザルト
         Text resTitle, resTotal, resGrade, resStamp, resPrompt, resRecord; RectTransform resGradeRt, resStampRt; Image resGradeRing;
         readonly List<Text> resRows = new List<Text>();
+        readonly List<Text> resVals = new List<Text>();
         CanvasGroup resGroup;
         public struct ResultData { public bool win; public string reason; public int dealt, killBonus, timeBonus, hpBonus, perfectBonus, comboBonus, total, best, maxCombo, perfects, reactions; public string grade, charName; public bool record; }
         ResultData res; float resT; bool resActive; int shownTotal;
@@ -58,16 +67,21 @@ namespace AndoBoss
             bigFont = Resources.Load<Font>("Fonts/DelaGothicOne-Regular");
             if (uiFont == null) uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (bigFont == null) bigFont = uiFont;
+            // 菅原先生の字幕用：かすれた筆文字（使う文字だけに絞ったフォント）＋かすれシェーダー
+            raspyFont = Resources.Load<Font>("Fonts/YujiBoku-Subset");
+            if (raspyFont == null) raspyFont = uiFont;
+            var ksh = Shader.Find("AndoBoss/UIKasure");
+            if (ksh != null) raspyMat = new Material(ksh);
 
             var cgo = new GameObject("HUD");
             cgo.transform.SetParent(transform, false);
             canvas = cgo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 10;
-            var scaler = cgo.AddComponent<CanvasScaler>();
+            scaler = cgo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 0.5f;
+            FitScaler();
             root = cgo.GetComponent<RectTransform>();
 
             // 画面ふちの赤（被弾）・水色（ジャスト回避）
@@ -91,6 +105,8 @@ namespace AndoBoss
             BuildIntro();
             select = Full(root, "select");
             BuildSelect();
+            bossSel = Full(root, "bossSel");
+            BuildBossSelect();
             title = Full(root, "title");
             BuildTitle();
             result = Full(root, "result");
@@ -187,23 +203,23 @@ namespace AndoBoss
             Anchor(bossName.rectTransform, top, new Vector2(0, -42));
             Shadowed(bossName, new Color(0, 0, 0, 0.8f), 2);
             var lv = Label(battle, "Lv.90", uiFont, 22, Mat.Gold, Vector2.zero, TextAnchor.MiddleLeft, 200);
-            Anchor(lv.rectTransform, top, new Vector2(-520, -46));
+            Place(lv.rectTransform, top, new Vector2(0, 0.5f), new Vector2(-480, -46));
             var bb = Bar(battle, new Vector2(0, -80), new Vector2(960, 26), new Color(0.15f, 0.1f, 0.15f, 0.9f), out bossLag, new Color(1, 0.95f, 0.85f), out bossFill, out bossFillImg, new Color(0.93f, 0.25f, 0.3f), top);
             // 50% の目印
             Img(New(bb, "mark", new Vector2(0.5f, 0), new Vector2(0.5f, 1), Vector2.zero, new Vector2(3, 6)), new Color(1, 1, 1, 0.8f));
             Bar(battle, new Vector2(0, -102), new Vector2(760, 12), new Color(0.1f, 0.08f, 0.15f, 0.9f), out var tl, new Color(0, 0, 0, 0), out toughFill, out toughFillImg, new Color(0.75f, 0.6f, 1f), top);
             tl.gameObject.SetActive(false);
             toughLabel = Label(battle, "理論武装", uiFont, 18, new Color(0.85f, 0.8f, 1f), Vector2.zero, TextAnchor.MiddleRight, 200);
-            Anchor(toughLabel.rectTransform, top, new Vector2(-490, -102));
+            Place(toughLabel.rectTransform, top, new Vector2(1, 0.5f), new Vector2(-392, -102));
 
             var tr = new Vector2(1, 1);
             var tlabel = Label(battle, "残り時間", uiFont, 22, new Color(1, 1, 1, 0.8f), Vector2.zero, TextAnchor.MiddleRight, 300);
-            Anchor(tlabel.rectTransform, tr, new Vector2(-190, -40));
+            Place(tlabel.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -22));
             timerText = Label(battle, "3:00", bigFont, 56, Color.white, Vector2.zero, TextAnchor.MiddleRight, 300);
-            Anchor(timerText.rectTransform, tr, new Vector2(-190, -85));
+            Place(timerText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -52));
             Shadowed(timerText, new Color(0, 0, 0, 0.7f), 3);
             dmgText = Label(battle, "与ダメージ 0", uiFont, 26, Mat.Gold, Vector2.zero, TextAnchor.MiddleRight, 400);
-            Anchor(dmgText.rectTransform, tr, new Vector2(-190, -130));
+            Place(dmgText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -128));
             Shadowed(dmgText, new Color(0, 0, 0, 0.7f), 2);
 
             // プレイヤーHP
@@ -213,7 +229,7 @@ namespace AndoBoss
             Shadowed(pn, new Color(0, 0, 0, 0.8f), 2);
             playerName = pn;
             slowText = Label(battle, "", uiFont, 24, new Color(0.5f, 1f, 0.65f), Vector2.zero, TextAnchor.MiddleCenter, 400);
-            Anchor(slowText.rectTransform, bc, new Vector2(0, 130));
+            Anchor(slowText.rectTransform, bc, new Vector2(0, 132));
             Shadowed(slowText, new Color(0, 0, 0, 0.8f), 2);
 
             // パーティ（右側。1・2・3 キーで交代）
@@ -246,7 +262,7 @@ namespace AndoBoss
 
             // 特技 E
             var br = new Vector2(1, 0);
-            skillRt = New(battle, "skill", br, br, new Vector2(-300, 110), new Vector2(118, 118));
+            skillRt = New(battle, "skill", br, br, new Vector2(-330, 150), new Vector2(118, 118));
             Img(skillRt, new Color(0.08f, 0.06f, 0.15f, 0.75f), Mat.CircleSprite);
             Img(New(skillRt, "rim", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero), new Color(1, 1, 1, 0.6f), Mat.RingSprite);
             skillIcon = Img(New(skillRt, "icon", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(84, 84)), Mat.Electro, Sprite.Create(Mat.Star, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f)));
@@ -257,7 +273,7 @@ namespace AndoBoss
             skillLabel = KeyCap(skillRt, "E", "レポート提出");
 
             // 奥義 Q
-            burstRt = New(battle, "burst", br, br, new Vector2(-135, 135), new Vector2(160, 160));
+            burstRt = New(battle, "burst", br, br, new Vector2(-150, 170), new Vector2(160, 160));
             burstGlow = Img(New(burstRt, "glow", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 300)), new Color(0.75f, 0.5f, 1f, 0), Mat.GlowSprite);
             Img(New(burstRt, "bg", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero), new Color(0.08f, 0.06f, 0.15f, 0.8f), Mat.CircleSprite);
             Img(New(burstRt, "ringbg", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero), new Color(1, 1, 1, 0.15f), Mat.RingSprite);
@@ -269,18 +285,18 @@ namespace AndoBoss
             burstLabelName = KeyCap(burstRt, "Q", "一夜漬け・雷光乱舞");
 
             // コンボ
-            comboRt = New(battle, "combo", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-230, 140), new Vector2(400, 200));
+            comboRt = New(battle, "combo", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-360, 150), new Vector2(400, 200));
             comboGroup = comboRt.gameObject.AddComponent<CanvasGroup>();
             comboNum = Label(comboRt, "0", bigFont, 100, Color.white, new Vector2(-40, 20), TextAnchor.MiddleRight, 360, 130);
             Shadowed(comboNum, new Color(0.35f, 0.1f, 0.5f), 4);
-            comboLabel = Label(comboRt, "HIT", bigFont, 40, Mat.Gold, new Vector2(155, 5), TextAnchor.MiddleLeft, 200);
+            comboLabel = Label(comboRt, "HIT", bigFont, 40, Mat.Gold, new Vector2(245, 5), TextAnchor.MiddleLeft, 200);
             Shadowed(comboLabel, new Color(0.3f, 0.15f, 0), 2);
             comboRate = Label(comboRt, "", uiFont, 34, Mat.ElectroLight, new Vector2(20, -60), TextAnchor.MiddleCenter, 400);
             Shadowed(comboRate, new Color(0.2f, 0.05f, 0.35f), 2);
             comboGroup.alpha = 0;
 
             // セリフ字幕
-            var sg = New(root, "sub", bc, bc, new Vector2(0, 185), new Vector2(1400, 70));
+            var sg = New(root, "sub", bc, bc, new Vector2(0, 220), new Vector2(1400, 70));
             subGroup = sg.gameObject.AddComponent<CanvasGroup>();
             Img(New(sg, "bg", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1300, 110)), new Color(0, 0, 0, 0.55f), Mat.GlowSprite);
             subName = Label(sg, "安東先生", uiFont, 26, Mat.Gold, new Vector2(0, 22), TextAnchor.MiddleCenter, 600);
@@ -288,16 +304,36 @@ namespace AndoBoss
             Shadowed(subText, new Color(0, 0, 0, 0.8f), 2);
             subGroup.alpha = 0;
 
+            // 菅原先生のカウント（左上。5つたまると単位消滅）
+            countRt = New(battle, "count", new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -40), new Vector2(420, 110), new Vector2(0, 1));
+            countGroup = countRt.gameObject.AddComponent<CanvasGroup>();
+            var clab = Label(countRt, "カウント（5つで単位消滅）", uiFont, 22, new Color(1f, 0.6f, 0.65f), Vector2.zero, TextAnchor.UpperLeft, 420, 30);
+            Place(clab.rectTransform, new Vector2(0, 1), new Vector2(0, 1), Vector2.zero);
+            Shadowed(clab, new Color(0, 0, 0, 0.8f), 2);
+            for (int i = 0; i < Game.MaxCount; i++)
+            {
+                var slot = New(countRt, "slot" + i, new Vector2(0, 1), new Vector2(0, 1), new Vector2(i * 66, -36), new Vector2(58, 58), new Vector2(0, 1));
+                var img = Img(slot, new Color(1, 1, 1, 0.15f), Mat.RoundSprite); img.type = Image.Type.Sliced;
+                var x = Label(slot, "×", bigFont, 48, Color.white, Vector2.zero, TextAnchor.MiddleCenter, 58, 58);
+                Shadowed(x, new Color(0.3f, 0, 0), 2);
+                countSlots.Add(img);
+            }
+            countGroup.alpha = 0;
+
             // ボスについている属性
             auraDot = Img(New(battle, "aura", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(510, -80), new Vector2(34, 34)), Color.white, Mat.CircleSprite);
             auraText = Label(auraDot.rectTransform, "", uiFont, 20, new Color(0.1f, 0.05f, 0.15f), Vector2.zero, TextAnchor.MiddleCenter, 40);
             defDownText = Label(battle, "", uiFont, 22, new Color(1f, 0.6f, 0.3f), Vector2.zero, TextAnchor.MiddleLeft, 400);
-            Anchor(defDownText.rectTransform, new Vector2(0.5f, 1), new Vector2(740, -80));
+            defDownText.alignment = TextAnchor.MiddleCenter;
+            Anchor(defDownText.rectTransform, new Vector2(0.5f, 1), new Vector2(0, -128));
             Shadowed(defDownText, new Color(0, 0, 0, 0.8f), 2);
 
-            hintText = Label(battle, "WASD 移動　クリック/J 攻撃　E 特技　Q 奥義　Shift 回避　Space ジャンプ　Tab ロックオン　F2 光　F3 画風　Esc 一時停止",
+            hintText = Label(battle, "WASD 移動　クリック/J 攻撃　E 特技　Q 奥義\nShift 回避　Space ジャンプ　Tab ロックオン\nF2 光　F3 画風　Esc 一時停止",
                 uiFont, 18, new Color(1, 1, 1, 0.75f), Vector2.zero, TextAnchor.MiddleLeft, 1400);
-            Anchor(hintText.rectTransform, Vector2.zero, new Vector2(730, 24));
+            hintText.fontSize = 17; hintText.lineSpacing = 1.1f;
+            Place(hintText.rectTransform, Vector2.zero, Vector2.zero, new Vector2(24, 16));
+            hintText.rectTransform.sizeDelta = new Vector2(520, 80);
+            hintText.alignment = TextAnchor.LowerLeft;
             Shadowed(hintText, new Color(0, 0, 0, 0.7f), 1);
 
             // 映画みたいな黒帯
@@ -313,6 +349,14 @@ namespace AndoBoss
             var n = Label(parent, name, uiFont, 20, Color.white, new Vector2(0, -parent.sizeDelta.y / 2 - 40), TextAnchor.MiddleCenter, 260);
             Shadowed(n, new Color(0, 0, 0, 0.8f), 1);
             return n;
+        }
+
+        // 画面の端にぴったり寄せて置く（基準点を寄せる側にそろえる）
+        static void Place(RectTransform rt, Vector2 anchor, Vector2 pivot, Vector2 pos)
+        {
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = pivot;
+            rt.anchoredPosition = pos;
         }
 
         static void Anchor(RectTransform rt, Vector2 a, Vector2 pos)
@@ -367,7 +411,7 @@ namespace AndoBoss
             Shadowed(titleBig, new Color(0.45f, 0.12f, 0.1f), 6);
             titleSub = Label(titleBlock, "〜 電気回路 期末ボス決戦 〜", uiFont, 44, Mat.ElectroLight, new Vector2(0, -80), TextAnchor.MiddleCenter, 1100);
             Shadowed(titleSub, new Color(0.15f, 0.05f, 0.3f), 3);
-            titlePrompt = Label(title, "クリック または Enter で開始", uiFont, 44, Color.white, new Vector2(-340, -250), TextAnchor.MiddleCenter, 1100);
+            titlePrompt = Label(title, "クリック・Enter・A（×）ボタンで開始", uiFont, 44, Color.white, new Vector2(-340, -250), TextAnchor.MiddleCenter, 1100);
             Shadowed(titlePrompt, new Color(0.2f, 0.05f, 0.4f), 3);
             titleBest = Label(title, "", uiFont, 30, Mat.Gold, new Vector2(-340, -320), TextAnchor.MiddleCenter, 1100);
             Shadowed(titleBest, new Color(0, 0, 0, 0.7f), 2);
@@ -387,7 +431,10 @@ namespace AndoBoss
                 Label(panel, rows[i, 1], uiFont, 24, Mat.ElectroLight, new Vector2(40, 205 - i * 42), TextAnchor.MiddleRight, 400);
             }
             Label(panel, "ジャスト回避とブレイクを狙え！\nエナジードリンクを拾うと回復！", uiFont, 21, new Color(1, 0.9f, 0.6f), new Vector2(0, -255), TextAnchor.MiddleCenter, 540, 70);
-            var credit = Label(title, "音楽・効果音・グラフィックはすべてプログラムで生成しています。安東先生は架空の人物です。", uiFont, 20, new Color(1, 1, 1, 0.7f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
+            var pad = Label(title, "コントローラー（Xbox / PS）：X・□ 攻撃　A・× ジャンプ　B・○ 回避　RB・R1 特技　Y・△ 奥義　START 開始・一時停止", uiFont, 22, new Color(1, 1, 1, 0.85f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
+            Anchor(pad.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 70));
+            Shadowed(pad, new Color(0, 0, 0, 0.8f), 2);
+            var credit = Label(title, "音楽・効果音・グラフィックはすべてプログラムで生成しています。安東先生・菅原先生は架空の人物です。", uiFont, 20, new Color(1, 1, 1, 0.7f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
             Anchor(credit.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 30));
         }
 
@@ -402,8 +449,11 @@ namespace AndoBoss
             Shadowed(resTitle, new Color(0.35f, 0.1f, 0.55f), 5);
             for (int i = 0; i < 7; i++)
             {
-                var t = Label(panel, "", uiFont, 32, Color.white, new Vector2(0, 200 - i * 58), TextAnchor.MiddleLeft, 760);
+                // 左に項目名、右に数字（数字は右ぞろえで縦の列をそろえる）
+                var t = Label(panel, "", uiFont, 32, Color.white, new Vector2(0, 200 - i * 58), TextAnchor.MiddleLeft, 700);
                 resRows.Add(t);
+                var v = Label(t.rectTransform, "", uiFont, 32, Color.white, Vector2.zero, TextAnchor.MiddleRight, 700);
+                resVals.Add(v);
             }
             Img(New(panel, "line", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -225), new Vector2(760, 3)), new Color(1, 1, 1, 0.5f));
             resTotal = Label(panel, "", bigFont, 64, Mat.Gold, new Vector2(0, -280), TextAnchor.MiddleCenter, 860, 90);
@@ -435,7 +485,7 @@ namespace AndoBoss
                 var border = Img(card, d.ElemColor, Mat.RoundSprite); border.type = Image.Type.Sliced;
                 var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
                 bg.type = Image.Type.Sliced;
-                var nm = Label(card, d.Name, bigFont, 56, Color.white, new Vector2(-40, 140), TextAnchor.MiddleLeft, 480, 80);
+                var nm = Label(card, d.Name, bigFont, 50, Color.white, new Vector2(-10, 140), TextAnchor.MiddleLeft, 460, 80);
                 Shadowed(nm, Color.Lerp(d.ElemColor, Color.black, 0.5f), 3);
                 var dot = Img(New(card, "dot", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(225, 140), new Vector2(56, 56)), d.ElemColor, Mat.CircleSprite);
                 Label(dot.rectTransform, Elements.Kanji(d.Elem), uiFont, 30, new Color(0.1f, 0.05f, 0.15f), Vector2.zero, TextAnchor.MiddleCenter, 60);
@@ -450,6 +500,42 @@ namespace AndoBoss
             select.gameObject.SetActive(false);
         }
 
+        // ---------------- ボス選択 ----------------
+        static readonly string[,] BossInfo =
+        {
+            { "安東先生", "電気回路担当　〜単位の番人〜", "雷・抵抗器の弾幕・いやいや攻撃\n必殺「三相交流」、トランスで鈍足\nセリフはぜんぶ秋田弁", "#ffd54d" },
+            { "菅原先生", "英語担当　〜死神・北の破壊神〜", "攻撃に当たると「カウント」がつく\nカウント5つで単位消滅（即アウト）\nジャスト回避でカウントを1つ取り消せる", "#ff4d5e" },
+        };
+
+        void BuildBossSelect()
+        {
+            var head = Label(bossSel, "たおす先生を選んでください", uiFont, 44, Color.white, new Vector2(0, 450), TextAnchor.MiddleCenter, 1600);
+            Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
+            var help = Label(bossSel, "← → か 1・2 で選ぶ　／　Enter・クリックで決定　／　T でタイトルへ", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
+            Shadowed(help, new Color(0, 0, 0, 0.8f), 2);
+            for (int i = 0; i < 2; i++)
+            {
+                ColorUtility.TryParseHtmlString(BossInfo[i, 3], out var c);
+                var card = New(bossSel, "boss" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 0.5f) * 700, -290), new Vector2(660, 360));
+                var border = Img(card, c, Mat.RoundSprite); border.type = Image.Type.Sliced;
+                var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
+                bg.type = Image.Type.Sliced;
+                var nm = Label(card, BossInfo[i, 0], bigFont, 60, Color.white, new Vector2(0, 120), TextAnchor.MiddleCenter, 620, 90);
+                Shadowed(nm, Color.Lerp(c, Color.black, 0.5f), 3);
+                Label(card, BossInfo[i, 1], uiFont, 28, c, new Vector2(0, 55), TextAnchor.MiddleCenter, 620);
+                var desc = Label(card, BossInfo[i, 2], uiFont, 25, Color.white, new Vector2(0, -60), TextAnchor.MiddleCenter, 620, 150);
+                desc.lineSpacing = 1.15f;
+                bossCards.Add((card, bg, border));
+            }
+            bossSel.gameObject.SetActive(false);
+        }
+
+        public void ShowBossSelect(int idx)
+        {
+            if (!bossSel.gameObject.activeSelf) { ShowOnly(bossSel); bossT = 0; }
+            bossIdx = idx;
+        }
+
         public void ShowSelect(int idx)
         {
             if (!select.gameObject.activeSelf) { ShowOnly(select); selT = 0; }
@@ -458,7 +544,7 @@ namespace AndoBoss
 
         void ShowOnly(RectTransform which)
         {
-            foreach (var r in new[] { battle, title, result, select })
+            foreach (var r in new[] { battle, title, result, select, bossSel })
                 r.gameObject.SetActive(r == which);
         }
 
@@ -471,13 +557,26 @@ namespace AndoBoss
             letterTarget = 0;
         }
         public void ShowBattle() { ShowOnly(battle); comboGroup.alpha = 0; subGroup.alpha = 0; }
-        public void ShowIntro() { introT = 0; letterTarget = 1; }
+        public void ShowIntro()
+        {
+            introT = 0; letterTarget = 1;
+            bool suga = Game.I.Boss.IsSuga;
+            introSmall.text = suga ? "英語担当" : "電気回路担当";
+            introBig.text = suga ? "菅原 先生" : "安東 先生";
+            introSub.text = suga ? "〜 死神・北の破壊神 〜" : "〜 単位の番人 〜";
+        }
         public void EndIntro() { letterTarget = 0; }
         public void Pause(bool on) { pause.gameObject.SetActive(on); pause.SetAsLastSibling(); }
         public void Letterbox(bool on) => letterTarget = on ? 1 : 0;
 
-        public void Say(string text, float sec = 2.6f, string speaker = "安東先生")
+        public void Say(string text, float sec = 2.6f, string speaker = "安東先生", bool isRaspy = false)
         {
+            raspy = isRaspy;
+            // 菅原先生のときは、かすれた筆文字でガラガラに見せる
+            subText.font = raspy ? raspyFont : uiFont;
+            subText.material = raspy ? raspyMat : null;
+            subText.fontSize = raspy ? 40 : 34;
+            subText.color = raspy ? new Color(0.92f, 0.88f, 0.95f) : Color.white;
             subName.text = speaker;
             subText.text = text;
             subT = sec;
@@ -497,6 +596,7 @@ namespace AndoBoss
         public void Hurt(float strength) => hurtA = Mathf.Max(hurtA, strength);
         public void Perfect() => perfectA = 1;
         public void BossBarShake() => bossBarShake = 1;
+        public void CountPop() => countPop = 1;
 
         public void Combo(int n)
         {
@@ -589,15 +689,22 @@ namespace AndoBoss
             resTitle.color = d.win ? Mat.Gold : new Color(0.75f, 0.8f, 1f);
             string[] rows =
             {
-                $"与えたダメージ　　　　{d.dealt}",
-                d.win ? $"撃破ボーナス　　　　　+{d.killBonus}" : "撃破ボーナス　　　　　―",
-                d.win ? $"残り時間ボーナス　　　+{d.timeBonus}" : "残り時間ボーナス　　　―",
-                d.win ? $"残りHPボーナス　　　　+{d.hpBonus}" : "残りHPボーナス　　　　―",
-                $"ジャスト回避 ×{d.perfects}　　 +{d.perfectBonus}",
-                $"最大コンボ {d.maxCombo}　　　　+{d.comboBonus}",
-                $"使ったキャラ　　　　　{d.charName}",
+                $"与えたダメージ|{d.dealt}",
+                d.win ? $"撃破ボーナス|+{d.killBonus}" : "撃破ボーナス|―",
+                d.win ? $"残り時間ボーナス|+{d.timeBonus}" : "残り時間ボーナス|―",
+                d.win ? $"残りHPボーナス|+{d.hpBonus}" : "残りHPボーナス|―",
+                $"ジャスト回避 ×{d.perfects}|+{d.perfectBonus}",
+                $"最大コンボ {d.maxCombo}|+{d.comboBonus}",
+                $"使ったキャラ|{d.charName}",
             };
-            for (int i = 0; i < resRows.Count; i++) { resRows[i].text = rows[i]; resRows[i].color = new Color(1, 1, 1, 0); }
+            for (int i = 0; i < resRows.Count; i++)
+            {
+                var parts = rows[i].Split('|');
+                resRows[i].text = parts[0];
+                resVals[i].text = parts.Length > 1 ? parts[1] : "";
+                resRows[i].color = new Color(1, 1, 1, 0);
+                resVals[i].color = new Color(1, 1, 1, 0);
+            }
             resTotal.text = "";
             resGrade.text = d.grade;
             resStamp.text = d.win ? "単位認定" : "単位不認定";
@@ -610,8 +717,19 @@ namespace AndoBoss
         }
 
         // ================= 毎フレーム =================
+        // 16:9 より細い画面（5:4 や 4:3）では横幅に合わせ、広い画面では高さに合わせる。
+        // こうすると 1920x1080 基準の配置が、どの比率でも画面からはみ出さない
+        CanvasScaler scaler;
+        void FitScaler()
+        {
+            if (scaler == null) return;
+            float aspect = (float)Screen.width / Mathf.Max(1, Screen.height);
+            scaler.matchWidthOrHeight = aspect < 16f / 9f - 0.01f ? 0f : 1f;
+        }
+
         void Update()
         {
+            FitScaler();
             float dt = Time.unscaledDeltaTime;
             var G = Game.I;
             if (G == null) return;
@@ -680,6 +798,20 @@ namespace AndoBoss
             bool hideUi = G.State == Game.Mode.Intro || G.Cinematic;
             battleGroup.alpha = Mathf.MoveTowards(battleGroup.alpha, hideUi ? 0 : 1, dt * 4);
             if (battle.gameObject.activeSelf) UpdateBattle(dt, G);
+            if (bossSel.gameObject.activeSelf)
+            {
+                bossT += dt;
+                for (int i = 0; i < bossCards.Count; i++)
+                {
+                    bool on = i == bossIdx;
+                    var c = bossCards[i];
+                    c.rt.localScale = Vector3.one * Mathf.Lerp(c.rt.localScale.x, on ? 1.05f + 0.015f * Mathf.Sin(bossT * 5) : 0.92f, dt * 12);
+                    ColorUtility.TryParseHtmlString(BossInfo[i, 3], out var bc);
+                    c.border.color = on ? bc : new Color(bc.r, bc.g, bc.b, 0.25f);
+                    c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
+                    c.rt.anchoredPosition = new Vector2((i - 0.5f) * 700, -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - bossT * 3) * 300);
+                }
+            }
             if (select.gameObject.activeSelf)
             {
                 selT += dt;
@@ -697,6 +829,8 @@ namespace AndoBoss
             }
             // 字幕（登場演出・決着の演出中も出す。結果画面では消す）
             subT -= dt;
+            if (subBase == Vector2.zero) subBase = subText.rectTransform.anchoredPosition;
+            subText.rectTransform.anchoredPosition = raspy ? subBase + new Vector2(Random.Range(-1.5f, 1.5f), Random.Range(-1f, 1f)) : subBase;
             subGroup.alpha = Mathf.MoveTowards(subGroup.alpha, subT > 0 && !result.gameObject.activeSelf && !title.gameObject.activeSelf ? 1 : 0, dt * 5);
             UpdateNums(dt);
             if (resActive && result.gameObject.activeSelf) UpdateResult(dt);
@@ -724,7 +858,19 @@ namespace AndoBoss
                 toughLabel.text = "理論武装";
                 toughLabel.color = new Color(0.85f, 0.8f, 1f);
             }
-            bossName.text = B.Phase == 2 ? "電気回路担当・安東先生〔本気〕" : "電気回路担当・安東先生";
+            string bn = B.IsSuga ? "英語担当・菅原先生" : "電気回路担当・安東先生";
+            bossName.text = B.Phase == 2 ? bn + "〔本気〕" : bn;
+            // カウント表示（菅原先生のときだけ）
+            countGroup.alpha = B.IsSuga ? 1 : 0;
+            countPop = Mathf.MoveTowards(countPop, 0, dt * 3);
+            countRt.localScale = Vector3.one * (1 + countPop * 0.25f);
+            for (int i = 0; i < countSlots.Count; i++)
+            {
+                bool on = i < G.Counts;
+                float blink = G.Counts == Game.MaxCount - 1 && on ? 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 10) : 1;
+                countSlots[i].color = on ? new Color(1f, 0.2f, 0.28f, blink) : new Color(1, 1, 1, 0.15f);
+                countSlots[i].transform.GetChild(0).gameObject.SetActive(on);
+            }
 
             float tl = Mathf.Max(0, G.TimeLeft);
             int sec = Mathf.CeilToInt(tl);
@@ -761,7 +907,10 @@ namespace AndoBoss
             burstRing.color = ready ? Color.Lerp(ec, Color.white, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8)) : ec;
             burstGlow.color = new Color(ec.r, ec.g, ec.b, ready ? 0.5f + 0.25f * Mathf.Sin(Time.unscaledTime * 6) : 0);
 
-            playerName.text = $"{P.Def.Name}　Lv.90";
+            hintText.text = GameInput.PadConnected
+                ? "左スティック 移動　右スティック 視点　X・□ 攻撃\nA・× ジャンプ　B・○ 回避　RB・R1 特技\nY・△ 奥義　R3 ロックオン　START 一時停止"
+                : "WASD 移動　クリック/J 攻撃　E 特技　Q 奥義\nShift 回避　Space ジャンプ　Tab ロックオン\nF2 光　F3 画風　Esc 一時停止";
+            playerName.text = P.Def.Passive.StartsWith("留年") && !G.ReviveUsed ? $"{P.Def.Name}　Lv.90　<color=#ffd54d>留年×1</color>" : $"{P.Def.Name}　Lv.90";
             slowText.text = G.SlowT > 0 ? $"鈍足（トランス）　{G.SlowT:0.0}" : "";
             swapFlash = Mathf.MoveTowards(swapFlash, 0, dt * 3);
             for (int i = 0; i < partyRows.Count; i++)
@@ -769,7 +918,7 @@ namespace AndoBoss
                 var r = partyRows[i];
                 bool on = i == G.Active;
                 var pm = G.Party[i];
-                r.rt.gameObject.SetActive(on); // 交代なしなので、選んだキャラだけ表示
+                r.rt.gameObject.SetActive(false); // 交代なしなので表示しない（留年の残りは名前の横に出す）
                 r.rt.anchoredPosition = new Vector2(-170 - swapFlash * 20, -20);
                 r.rt.localScale = Vector3.one * (on ? 1.08f : 0.95f);
                 r.name.color = on ? Color.white : new Color(1, 1, 1, 0.6f);
@@ -777,13 +926,8 @@ namespace AndoBoss
                 bool rdy = pm.Energy >= 100;
                 r.ready.color = new Color(pm.Def.ElemColor.r, pm.Def.ElemColor.g, pm.Def.ElemColor.b, rdy ? 0.6f + 0.3f * Mathf.Sin(Time.unscaledTime * 6) : 0);
             }
-            if (B.Aura != Elem.None)
-            {
-                auraDot.enabled = true; auraText.enabled = true;
-                auraDot.color = Elements.Color(B.Aura);
-                auraText.text = Elements.Kanji(B.Aura);
-            }
-            else { auraDot.enabled = false; auraText.enabled = false; }
+            // 交代がなくなったので属性コンボは起きない。ボスの属性表示は出さない
+            auraDot.enabled = false; auraText.enabled = false;
             defDownText.text = B.DefDownT > 0 ? $"防御ダウン {B.DefDownT:0.0}" : "";
             burstIcon.color = ready ? Mat.Gold : new Color(1, 1, 1, 0.35f);
             burstIcon.transform.localRotation = Quaternion.Euler(0, 0, ready ? Time.unscaledTime * 90 : 0);
@@ -825,6 +969,7 @@ namespace AndoBoss
             {
                 float a = Mathf.Clamp01((resT - 0.3f - i * 0.18f) * 4);
                 var c = resRows[i].color; c.a = a; resRows[i].color = c;
+                resVals[i].color = new Color(Mat.Gold.r, Mat.Gold.g, Mat.Gold.b, a);
                 resRows[i].rectTransform.anchoredPosition = new Vector2(-40 + 40 * a, 200 - i * 58);
                 if (a > 0 && a < 1 && resRows[i].text != "" && Mathf.Abs(a - 0.25f) < 0.07f) Sfx.Play("tick", 0.4f);
             }

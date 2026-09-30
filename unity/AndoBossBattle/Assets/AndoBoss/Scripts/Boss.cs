@@ -5,13 +5,17 @@ using Random = UnityEngine.Random;
 
 namespace AndoBoss
 {
-    // ボス：電気回路担当・安東先生（架空の人物）
-    public class Boss : MonoBehaviour
+    // ボス：電気回路担当・安東先生／英語担当・菅原先生（どちらも架空の人物）
+    // 菅原先生の見た目・攻撃・セリフは BossSuga.cs
+    public partial class Boss : MonoBehaviour
     {
         public const float MaxHp = 16000f;
         public const float Radius = 1.7f;
         public const float MaxTough = 4200f;
 
+        public int Kind; // 0 = 安東先生, 1 = 菅原先生
+        public bool IsSuga => Kind == 1;
+        public string Name => IsSuga ? "菅原先生" : "安東先生";
         public Vector3 Pos;
         public float Y, Face, Hp, LagHp, Tough, BreakT, Flash, SinkT, FreezeT, DefDownT;
         public Elem Aura; public float AuraT;
@@ -35,6 +39,27 @@ namespace AndoBoss
 
         public void Build()
         {
+            BuildModel();
+            BuildCommon();
+        }
+
+        // ボスを切り替える（モデルを作り直す）
+        public void SetKind(int k)
+        {
+            if (k == Kind && inner != null) return;
+            Kind = k;
+            if (dizzy) dizzy.transform.SetParent(transform, false);
+            BuildModel();
+            if (dizzy) { dizzy.transform.SetParent(headT, false); dizzy.transform.localPosition = new Vector3(0, 2.1f, 0); }
+            ResetState();
+        }
+
+        void BuildModel()
+        {
+            if (inner != null) Destroy(inner.gameObject);
+            foreach (var m in mats) if (m) Destroy(m);
+            mats.Clear();
+            if (IsSuga) { BuildSuga(); return; }
             inner = Mat.Pivot(transform, "inner", Vector3.zero);
             Material M(Color c, float o = 0.04f) { var m = Mat.Toon(c, o); mats.Add(m); return m; }
             var skin = M(new Color(0.95f, 0.82f, 0.69f));
@@ -112,7 +137,10 @@ namespace AndoBoss
             Mat.Part(book, Mat.Quad, cover, new Vector3(0, 0, -0.105f), new Vector3(0.92f, 1.27f, 1), default, false);
             var back = Mat.Toon(new Color(0.7f, 0.2f, 0.18f)); mats.Add(back);
             Mat.Part(book, Mat.Quad, back, new Vector3(0, 0, 0.105f), new Vector3(0.92f, 1.27f, 1), new Vector3(0, 180, 0), false);
+        }
 
+        void BuildCommon()
+        {
             // 第2形態のオーラ
             auraMat = Mat.Fx(new Color(0.7f, 0.45f, 1f, 0.22f), Mat.SoftGlow, true, 1.5f);
             aura = Mat.Part(transform, Mat.Quad, auraMat, new Vector3(0, 2.6f, 0), Vector3.one * 8, default, false);
@@ -181,7 +209,7 @@ namespace AndoBoss
         public void ResetState()
         {
             Pos = new Vector3(0, 0, 7); Y = 0; Face = Mathf.PI; Hp = MaxHp; LagHp = MaxHp; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
-            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; Aura = Elem.None; AuraT = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
+            Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; Aura = Elem.None; AuraT = 0; hakaiCd = 2f; PoseU = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
             restT = 1.2f; lastAtk = null; atk = null;
             aura.SetActive(false);
             dizzy.SetActive(false);
@@ -199,8 +227,8 @@ namespace AndoBoss
             Flash = 0.12f;
             float r = Hp / MaxHp;
             if (Phase == 1 && r <= 0.5f) PendingPhase = true;
-            if (!said75 && r <= 0.75f) { said75 = true; Game.I.Say("まだまだ単位はやれねど。"); }
-            if (!said25 && r <= 0.25f) { said25 = true; Game.I.Say("……なかなか、やるでねが。"); }
+            if (!said75 && r <= 0.75f) { said75 = true; Game.I.Say(Line("hp75")); }
+            if (!said25 && r <= 0.25f) { said25 = true; Game.I.Say(Line("hp25")); }
             if (!Broken && Hp > 0)
             {
                 Tough -= toughDmg;
@@ -268,7 +296,7 @@ namespace AndoBoss
                     dizzy.SetActive(false);
                     Pose = "idle";
                     restT = 0.6f;
-                    G.Say("……今のは見ねがったことにするがらな。");
+                    G.Say(Line("breakEnd"));
                 }
                 Animate(dt);
                 return;
@@ -306,6 +334,7 @@ namespace AndoBoss
             }
             if (restT <= 0)
             {
+                if (IsSuga) { PickSugaAttack(); Animate(dt); return; }
                 var opts = new List<string> { "lightning", "shots", "slam", "iyaiya", "trans" };
                 if (Phase == 2) { opts.Add("laser"); opts.Add("spiral"); opts.Add("iyaiya"); }
                 // 必殺「三相交流」はしばらく間をあけて使う
@@ -346,7 +375,7 @@ namespace AndoBoss
         public void OnHitPlayer()
         {
             if (Time.time < practiceCd) return;
-            if (Random.value < 0.35f) { practiceCd = Time.time + 9; Game.I.Say("練習問題と同じでねが！"); }
+            if (Random.value < 0.35f) { practiceCd = Time.time + 9; Game.I.Say(Line("hit")); }
         }
 
         public void Freeze(float sec)
@@ -356,6 +385,22 @@ namespace AndoBoss
             iceBlock.SetActive(sec > 0);
         }
         static string Pick(string k) { var a = Lines[k]; return a[Random.Range(0, a.Length)]; }
+
+        // 場面ごとの決まったセリフ（ボスごと）
+        static readonly Dictionary<string, string> AndoOne = new Dictionary<string, string>
+        {
+            { "intro", "……おめ、おれがら単位取るつもりだが？" },
+            { "hp75", "まだまだ単位はやれねど。" },
+            { "hp25", "……なかなか、やるでねが。" },
+            { "phase2", "おれ、もう知らねがらな！" },
+            { "break", "な……おれの理論が……！" },
+            { "breakEnd", "……今のは見ねがったことにするがらな。" },
+            { "win", "……しかたねな。単位、認めるべ。" },
+            { "lose", "へば、また来年な。" },
+            { "timeup", "時間だ。答案、回収するど。" },
+            { "hit", "練習問題と同じでねが！" },
+        };
+        public string Line(string key) => IsSuga ? SugaOne[key] : AndoOne[key];
 
         Func<float, bool> AtkLightning()
         {
@@ -746,7 +791,7 @@ namespace AndoBoss
         Func<float, bool> AtkRoar()
         {
             var G = Game.I;
-            G.Say("おれ、もう知らねがらな！", 2.6f);
+            G.Say(Line("phase2"), 2.6f);
             Pose = "roar";
             aura.SetActive(true);
             auraPs.Play();
@@ -819,6 +864,12 @@ namespace AndoBoss
                 case "slam":
                     aL = Quaternion.Euler(0, 0, -160); aR = Quaternion.Euler(0, 0, 160);
                     if (Y <= 0.01f) { aL = Quaternion.Euler(-40, 0, -40); aR = Quaternion.Euler(-40, 0, 40); lean = 20; sink = -0.3f; }
+                    break;
+                case "scythe":
+                    // 鎌を大きく振り回す
+                    aR = Quaternion.Euler(-70, 0, Mathf.Lerp(90, -70, PoseU));
+                    aL = Quaternion.Euler(-30, 0, -40);
+                    spinBody = Mathf.Lerp(-50, 50, PoseU); lean = 10;
                     break;
                 case "iyaiya":
                     // 首を横にぶんぶん振って、手足をばたばた
