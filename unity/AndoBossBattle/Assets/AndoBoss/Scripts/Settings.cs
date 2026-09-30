@@ -23,6 +23,12 @@ namespace AndoBoss
             string h = hp > 1.001f ? $"・自分の体力 {hp:0.##}倍" : "";
             return $"{DiffBase[d]}{h}（点数×{DiffScore[d]:0.0}）";
         }
+        // 難易度カードに出す説明（受けるダメージ・先生のHP・攻撃の間隔）
+        public static readonly string[] DiffDmgText = { "少なめ", "ふつう", "多め", "大" };
+        public static readonly string[] DiffBossHpText = { "7割", "そのまま", "1.15倍", "1.3倍" };
+        public static readonly string[] DiffRestText = { "ゆっくり", "ふつう", "せまい", "休みなし" };
+        public static float PlayerHpMulFor(int d) => (IsDouble ? DiffPlayerHpDouble : DiffPlayerHp)[d];
+        public static float ScoreMulFor(int d) => DiffScore[d];
         static readonly float[] DiffDmg = { 0.8f, 1.4f, 1.8f, 2.3f };
         static readonly float[] DiffHp = { 0.7f, 1f, 1.15f, 1.3f };
         // 自分（プレイヤー）の体力：難易度を上げるごとに増える（攻撃が激しくなるぶん、耐えられるように）

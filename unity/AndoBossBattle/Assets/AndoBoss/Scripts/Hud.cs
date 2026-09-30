@@ -11,7 +11,10 @@ namespace AndoBoss
         Material raspyMat;
         public Font BigFont => bigFont;
         Canvas canvas;
-        RectTransform root, battle, title, result, intro, pause, cutin, select, bossSel;
+        RectTransform root, battle, title, result, intro, pause, cutin, select, bossSel, diffSel;
+        readonly List<(RectTransform rt, Image bg, Image border, Text body)> diffCards = new List<(RectTransform, Image, Image, Text)>();
+        Text diffHelp; int diffIdx; float diffT;
+        static readonly Color[] DiffColors = { new Color(0.45f, 0.95f, 0.6f), new Color(0.55f, 0.8f, 1f), new Color(1f, 0.65f, 0.3f), new Color(1f, 0.3f, 0.38f) };
         readonly List<(RectTransform rt, Image bg, Image border)> bossCards = new List<(RectTransform, Image, Image)>();
         int bossIdx; float bossT;
         // 菅原先生のカウント表示
@@ -40,7 +43,7 @@ namespace AndoBoss
         Text titlePad;
         // 操作の表記（キーボードとコントローラーで切りかえる）
         readonly List<Text> titleRowVals = new List<Text>();
-        Text pauseHelp, selHelp, bossHelp, bossDiff, skillKey, burstKey;
+        Text pauseHelp, selHelp, bossHelp, skillKey, burstKey;
         RectTransform skillKeyRt, burstKeyRt;
         readonly List<(Text skill, Text burst)> selSkillLines = new List<(Text, Text)>();
         // 設定画面
@@ -120,6 +123,8 @@ namespace AndoBoss
             BuildSelect();
             bossSel = Full(root, "bossSel");
             BuildBossSelect();
+            diffSel = Full(root, "diffSel");
+            BuildDiffSelect();
             title = Full(root, "title");
             BuildTitle();
             settings = Full(root, "settings");
@@ -532,8 +537,6 @@ namespace AndoBoss
         {
             var head = Label(bossSel, "たおす先生を選んでください", uiFont, 44, Color.white, new Vector2(0, 450), TextAnchor.MiddleCenter, 1600);
             Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
-            bossDiff = Label(bossSel, "", uiFont, 30, Color.white, new Vector2(0, -478), TextAnchor.MiddleCenter, 1800);
-            Shadowed(bossDiff, new Color(0, 0, 0, 0.8f), 2);
             var help = bossHelp = Label(bossSel, "", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -515), TextAnchor.MiddleCenter, 1800);
             Shadowed(help, new Color(0, 0, 0, 0.8f), 2);
             for (int i = 0; i < BossInfo.GetLength(0); i++)
@@ -559,6 +562,39 @@ namespace AndoBoss
             bossIdx = idx;
         }
 
+        // ---------------- 難易度選択 ----------------
+        static float DiffCardX(int i) => (i - 1.5f) * 450;
+
+        void BuildDiffSelect()
+        {
+            var head = Label(diffSel, "難易度を選んでください", uiFont, 44, Color.white, new Vector2(0, 400), TextAnchor.MiddleCenter, 1600);
+            Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
+            diffHelp = Label(diffSel, "", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -470), TextAnchor.MiddleCenter, 1800);
+            Shadowed(diffHelp, new Color(0, 0, 0, 0.8f), 2);
+            for (int i = 0; i < Game.DiffNames.Length; i++)
+            {
+                var dc = DiffColors[i];
+                var card = New(diffSel, "diff" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(DiffCardX(i), -40), new Vector2(420, 520));
+                var border = Img(card, dc, Mat.RoundSprite); border.type = Image.Type.Sliced;
+                var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
+                bg.type = Image.Type.Sliced;
+                var nm = Label(card, Game.DiffNames[i], bigFont, 64, Color.white, new Vector2(0, 175), TextAnchor.MiddleCenter, 400, 100);
+                Shadowed(nm, Color.Lerp(dc, Color.black, 0.5f), 3);
+                // 難易度の段階を ★ で
+                Label(card, new string('★', i + 1) + new string('☆', 3 - i), uiFont, 34, dc, new Vector2(0, 100), TextAnchor.MiddleCenter, 400);
+                var body = Label(card, "", uiFont, 26, new Color(0.8f, 0.82f, 0.95f), new Vector2(0, -90), TextAnchor.MiddleCenter, 380, 300);
+                body.lineSpacing = 1.35f;
+                diffCards.Add((card, bg, border, body));
+            }
+            diffSel.gameObject.SetActive(false);
+        }
+
+        public void ShowDiffSelect(int idx)
+        {
+            if (!diffSel.gameObject.activeSelf) { ShowOnly(diffSel); diffT = 0; }
+            diffIdx = idx;
+        }
+
         public void ShowSelect(int idx)
         {
             if (!select.gameObject.activeSelf) { ShowOnly(select); selT = 0; }
@@ -567,7 +603,7 @@ namespace AndoBoss
 
         void ShowOnly(RectTransform which)
         {
-            foreach (var r in new[] { battle, title, result, select, bossSel, settings })
+            foreach (var r in new[] { battle, title, result, select, bossSel, diffSel, settings })
                 r.gameObject.SetActive(r == which);
         }
 
@@ -976,11 +1012,9 @@ namespace AndoBoss
             if (bossSel.gameObject.activeSelf)
             {
                 bossT += dt;
-                var dc = new[] { new Color(0.55f, 1f, 0.7f), Color.white, new Color(1f, 0.7f, 0.4f), new Color(1f, 0.35f, 0.4f) }[Game.Difficulty];
-                bossDiff.text = $"難易度：<color=#{ColorUtility.ToHtmlStringRGB(dc)}>◀ {Game.DiffNames[Game.Difficulty]} ▶</color>　<size=22>{Game.DiffNote(Game.Difficulty)}</size>";
                 bossHelp.text = GameInput.UsingPad
-                    ? $"十字キー ← → で先生、↑ ↓ で難易度　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} でタイトルへ"
-                    : "← → か 1・2・3 で先生、↑ ↓ で難易度　／　Enter・クリックで決定　／　BS でタイトルへ";
+                    ? $"十字キー・スティックで選ぶ　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} でタイトルへ"
+                    : "← → か 1・2・3 で選ぶ　／　Enter・クリックで決定　／　BS でタイトルへ";
                 for (int i = 0; i < bossCards.Count; i++)
                 {
                     bool on = i == bossIdx;
@@ -990,6 +1024,30 @@ namespace AndoBoss
                     c.border.color = on ? bc : new Color(bc.r, bc.g, bc.b, 0.25f);
                     c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
                     c.rt.anchoredPosition = new Vector2((i - 1) * BossCardGap, -262 + (on ? 14 : 0) - Mathf.Max(0, 1 - bossT * 3) * 300);
+                }
+            }
+            if (diffSel.gameObject.activeSelf)
+            {
+                diffT += dt;
+                diffHelp.text = GameInput.UsingPad
+                    ? $"十字キー・スティックで選ぶ　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} で先生選びにもどる"
+                    : "← → か 1〜4 で選ぶ　／　Enter・クリックで決定　／　BS で先生選びにもどる";
+                for (int i = 0; i < diffCards.Count; i++)
+                {
+                    bool on = i == diffIdx;
+                    var c = diffCards[i];
+                    var dc = DiffColors[i];
+                    c.rt.localScale = Vector3.one * Mathf.Lerp(c.rt.localScale.x, on ? 1.06f + 0.015f * Mathf.Sin(diffT * 5) : 0.93f, dt * 12);
+                    c.border.color = on ? dc : new Color(dc.r, dc.g, dc.b, 0.25f);
+                    c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
+                    c.rt.anchoredPosition = new Vector2(DiffCardX(i), -40 + (on ? 16 : 0) - Mathf.Max(0, 1 - diffT * 3) * 300);
+                    float hp = Game.PlayerHpMulFor(i);
+                    c.body.text =
+                        $"受けるダメージ　<color=#ffffff>{Game.DiffDmgText[i]}</color>\n" +
+                        $"先生のHP　<color=#ffffff>{Game.DiffBossHpText[i]}</color>\n" +
+                        $"自分の体力　<color=#ffffff>{(hp > 1.001f ? hp.ToString("0.##") + "倍" : "そのまま")}</color>\n" +
+                        $"攻撃の間隔　<color=#ffffff>{Game.DiffRestText[i]}</color>\n" +
+                        $"点数　<color=#ffd54d>×{Game.ScoreMulFor(i):0.0}</color>";
                 }
             }
             if (select.gameObject.activeSelf)

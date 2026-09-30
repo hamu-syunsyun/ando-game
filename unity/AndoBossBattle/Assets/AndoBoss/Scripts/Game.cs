@@ -33,7 +33,7 @@ namespace AndoBoss
         public static bool IsDouble => BossKind == 2;
         public const float DoubleTimeLimit = 300f;
         int KillBonus => IsDouble ? 3000 : 1000;
-        int selectStep;             // 0 = ボス選択, 1 = キャラ選択
+        int selectStep;             // 0 = ボス選択, 1 = 難易度選択, 2 = キャラ選択
         // パーティ共通のHP・スタミナ・デバフ
         public const float MaxStam = 150f;
         public float MaxStamina => MaxStam * Player.Def.StamMul; // キャラによって多い（ともき）
@@ -223,10 +223,39 @@ namespace AndoBoss
             Hud.ShowBossSelect(BossKind);
         }
 
-        // ボスを選んだあと、キャラ選択へ
-        internal void GoCharSelect()
+        // ボスを選んだあと、難易度選択へ
+        internal void GoDiffSelect()
         {
             selectStep = 1; stateT = 0;
+            Sfx.Play("confirm", 0.8f);
+            Hud.ShowDiffSelect(Difficulty);
+        }
+
+        void UpdateDiffSelect()
+        {
+            int d = Difficulty;
+            if (GameInput.Down(GameInput.K.Left)) d = Mathf.Max(0, d - 1);
+            if (GameInput.Down(GameInput.K.Right)) d = Mathf.Min(DiffNames.Length - 1, d + 1);
+            for (int i = 0; i < DiffNames.Length; i++) if (GameInput.Down(GameInput.K.Char1 + i)) d = i;
+            if (d != Difficulty)
+            {
+                SetDifficulty(d);
+                Sfx.Play("swap", 0.6f, 0.9f + d * 0.08f);
+                Hud.ShowDiffSelect(Difficulty);
+            }
+            var bp = BossFocus;
+            float back = IsDouble ? 1.45f : 1f;
+            Cam.Cinematic(bp + new Vector3(2.6f, 3.4f, -13.5f) * back, bp + Vector3.up * 3.3f, 40, false);
+            TickBosses(Time.deltaTime);
+            TickParty(Time.deltaTime);
+            if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoCharSelect();
+            if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoSelect();
+        }
+
+        // 難易度を選んだあと、キャラ選択へ
+        internal void GoCharSelect()
+        {
+            selectStep = 2; stateT = 0;
             Sfx.Play("confirm", 0.8f);
             for (int i = 0; i < Party.Length; i++)
             {
@@ -242,6 +271,7 @@ namespace AndoBoss
         void UpdateSelect()
         {
             if (selectStep == 0) { UpdateBossSelect(); return; }
+            if (selectStep == 1) { UpdateDiffSelect(); return; }
             int before = StartChar;
             if (GameInput.Down(GameInput.K.Left)) StartChar = (StartChar + Party.Length - 1) % Party.Length;
             if (GameInput.Down(GameInput.K.Right)) StartChar = (StartChar + 1) % Party.Length;
@@ -262,7 +292,7 @@ namespace AndoBoss
             }
             TickBosses(Time.deltaTime);
             if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoIntro();
-            if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoSelect();
+            if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoDiffSelect();
         }
 
         internal void SelectBoss(int k)
@@ -283,12 +313,6 @@ namespace AndoBoss
             if (GameInput.Down(GameInput.K.Char1)) BossKind = 0;
             if (GameInput.Down(GameInput.K.Char2)) BossKind = 1;
             if (GameInput.Down(GameInput.K.Char3)) BossKind = 2;
-            // ↑↓ で難易度
-            if (GameInput.Down(GameInput.K.Up) || GameInput.Down(GameInput.K.Down))
-            {
-                SetDifficulty(Difficulty + (GameInput.Down(GameInput.K.Up) ? 1 : -1));
-                Sfx.Play("tick", 0.7f, 1f + Difficulty * 0.1f);
-            }
             if (before != BossKind)
             {
                 Sfx.Play("swap", 0.6f, 0.9f);
@@ -299,7 +323,7 @@ namespace AndoBoss
             Cam.Cinematic(bp + new Vector3(2.6f, 3.4f, -13.5f) * back, bp + Vector3.up * 3.3f, 40, stateT < 0.05f);
             TickBosses(Time.deltaTime);
             TickParty(Time.deltaTime);
-            if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoCharSelect();
+            if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoDiffSelect();
             if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoTitle();
         }
 

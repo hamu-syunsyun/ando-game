@@ -49,6 +49,9 @@ namespace AndoBoss
             if (boss != 0) G.SelectBoss(boss);
             yield return Wait(1.2f);
             yield return ShotCo("02_bossselect");
+            G.GoDiffSelect();
+            yield return Wait(1.2f);
+            yield return ShotCo("025_diffselect");
             G.StartChar = chara;
             G.GoCharSelect();
             yield return Wait(1.2f);
