@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 
 namespace AndoBoss
 {
-    // コントローラー（Xbox / PlayStation）の入力。新 Input System の Gamepad で読むので、
+    // コントローラー（Xbox / PlayStation / Switch プロコン）の入力。新 Input System の Gamepad で読むので、
     // Xbox と PS でボタンの位置は同じ扱いになる（A＝×、B＝○、X＝□、Y＝△）
     //
     //   左スティック/十字キー：移動   右スティック：視点   R3：ロックオン切替
@@ -17,6 +17,19 @@ namespace AndoBoss
 #if ENABLE_INPUT_SYSTEM
         static Gamepad Pad => Gamepad.current;
         public static bool PadConnected => Gamepad.current != null;
+
+        // Switch プロコンかどうか。ボタンは位置で読むので、ゲーム中の操作は Xbox と同じ位置になる
+        // （Switch の Y＝攻撃、B＝ジャンプ、A＝回避）。メニューだけは Switch の決まりに合わせて A で決定・B で戻る
+        public static bool PadIsSwitch
+        {
+            get
+            {
+                var p = Pad;
+                if (p == null) return false;
+                var d = p.description;
+                return p.layout.Contains("Switch") || (d.product != null && d.product.Contains("Pro Controller")) || (d.manufacturer != null && d.manufacturer.Contains("Nintendo"));
+            }
+        }
 
         // スティックを倒した瞬間を「押した」として扱う（メニューの左右選択用）
         static int stickFrame = -1;
@@ -53,9 +66,9 @@ namespace AndoBoss
             {
                 case K.Attack: return p.buttonWest.wasPressedThisFrame;
                 case K.Jump: return p.buttonSouth.wasPressedThisFrame;
-                case K.Confirm: return p.buttonSouth.wasPressedThisFrame || p.startButton.wasPressedThisFrame;
+                case K.Confirm: return (PadIsSwitch ? p.buttonEast : p.buttonSouth).wasPressedThisFrame || p.startButton.wasPressedThisFrame;
                 case K.Dodge: return p.buttonEast.wasPressedThisFrame || p.rightTrigger.wasPressedThisFrame;
-                case K.Back: return p.buttonEast.wasPressedThisFrame;
+                case K.Back: return (PadIsSwitch ? p.buttonSouth : p.buttonEast).wasPressedThisFrame;
                 case K.Skill: return p.rightShoulder.wasPressedThisFrame;
                 case K.Burst: return p.buttonNorth.wasPressedThisFrame || p.leftShoulder.wasPressedThisFrame;
                 case K.Retry: return p.buttonNorth.wasPressedThisFrame;
@@ -92,6 +105,7 @@ namespace AndoBoss
         }
 #else
         public static bool PadConnected => false;
+        public static bool PadIsSwitch => false;
         static bool PadHeld(K k) => false;
         static bool PadDown(K k) => false;
         static Vector2 PadMove() => Vector2.zero;

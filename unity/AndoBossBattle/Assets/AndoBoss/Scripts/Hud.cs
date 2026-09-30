@@ -37,6 +37,9 @@ namespace AndoBoss
         Image hurtEdge, perfectEdge; float hurtA, perfectA;
         Image letterTop, letterBot; float letter, letterTarget;
         float bossBarShake;
+        Text titlePad;
+        const string PadLineXbox = "コントローラー（Xbox / PS / Switch）：X・□ 攻撃　A・× ジャンプ　B・○ 回避　RB・R1 特技　Y・△ 奥義　START 開始・一時停止";
+        const string PadLineSwitch = "Switch プロコン：Y 攻撃　B ジャンプ　A・ZR 回避　R 特技　X・L 奥義　A 決定　B 戻る　＋ 開始・一時停止";
         CanvasGroup subBossGroup;
         Text subBossName;
         RectTransform subBossFill;
@@ -443,7 +446,7 @@ namespace AndoBoss
                 Label(panel, rows[i, 1], uiFont, 24, Mat.ElectroLight, new Vector2(40, 205 - i * 42), TextAnchor.MiddleRight, 400);
             }
             Label(panel, "ジャスト回避とブレイクを狙え！\nエナジードリンクを拾うと回復！", uiFont, 21, new Color(1, 0.9f, 0.6f), new Vector2(0, -255), TextAnchor.MiddleCenter, 540, 70);
-            var pad = Label(title, "コントローラー（Xbox / PS）：X・□ 攻撃　A・× ジャンプ　B・○ 回避　RB・R1 特技　Y・△ 奥義　START 開始・一時停止", uiFont, 22, new Color(1, 1, 1, 0.85f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
+            var pad = titlePad = Label(title, PadLineXbox, uiFont, 22, new Color(1, 1, 1, 0.85f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
             Anchor(pad.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 70));
             Shadowed(pad, new Color(0, 0, 0, 0.8f), 2);
             var credit = Label(title, "音楽・効果音・グラフィックはすべてプログラムで生成しています。安東先生・菅原先生は架空の人物です。", uiFont, 20, new Color(1, 1, 1, 0.7f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
@@ -809,6 +812,7 @@ namespace AndoBoss
             if (title.gameObject.activeSelf)
             {
                 titleT += dt;
+                titlePad.text = GameInput.PadIsSwitch ? PadLineSwitch : PadLineXbox;
                 float e = Mathf.Clamp01(titleT / 0.6f);
                 titleBlock.anchoredPosition = new Vector2(620 - (1 - e) * (1 - e) * 400, 120 + Mathf.Sin(titleT * 1.5f) * 6);
                 titleBig.transform.localScale = Vector3.one * (1 + Mathf.Max(0, Mathf.Sin(titleT * 3)) * 0.03f);
@@ -960,7 +964,9 @@ namespace AndoBoss
             burstRing.color = ready ? Color.Lerp(ec, Color.white, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8)) : ec;
             burstGlow.color = new Color(ec.r, ec.g, ec.b, ready ? 0.5f + 0.25f * Mathf.Sin(Time.unscaledTime * 6) : 0);
 
-            hintText.text = GameInput.PadConnected
+            hintText.text = GameInput.PadIsSwitch
+                ? "左スティック 移動　右スティック 視点　Y 攻撃\nB ジャンプ　A・ZR 回避　R 特技\nX・L 奥義　R押しこみ ロックオン　＋ 一時停止"
+                : GameInput.PadConnected
                 ? "左スティック 移動　右スティック 視点　X・□ 攻撃\nA・× ジャンプ　B・○ 回避　RB・R1 特技\nY・△ 奥義　R3 ロックオン　START 一時停止"
                 : "WASD 移動　クリック/J 攻撃　E 特技　Q 奥義\nShift 回避　Space ジャンプ　Tab ロックオン\nF2 光　F3 画風　Esc 一時停止";
             playerName.text = P.Def.Passive.StartsWith("留年") && !G.ReviveUsed ? $"{P.Def.Name}　Lv.90　<color=#ffd54d>留年×1</color>" : $"{P.Def.Name}　Lv.90";
