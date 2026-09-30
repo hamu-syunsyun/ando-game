@@ -1,54 +1,115 @@
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 #endif
 
 namespace AndoBoss
 {
-    // コントローラー（Xbox / PlayStation / Switch プロコン）の入力。新 Input System の Gamepad で読むので、
-    // Xbox と PS でボタンの位置は同じ扱いになる（A＝×、B＝○、X＝□、Y＝△）
-    //
-    //   左スティック/十字キー：移動   右スティック：視点   R3：ロックオン切替
-    //   X/□：通常攻撃（押しっぱなしで連続）   A/×：ジャンプ・決定   B/○：回避・戻る
-    //   RB/R1：特技   Y/△ または LB/L1：奥義   RT/R2：回避
-    //   START/OPTIONS：一時停止   View/SHARE（Create）：タイトルへ
+    // コントローラー（Xbox / PlayStation / Switch プロコン）の入力。新 Input System の Gamepad で読む。
+    // ボタンは「位置」で扱う（下＝Xbox の A・PS の ×・Switch の B）。
+    // 戦闘の操作は Binds の割り当て、メニューの操作は固定：
+    //   左スティック/十字キー：移動・選択   右スティック：視点
+    //   決定：下のボタン（Switch は右の A）  戻る：右のボタン（Switch は下の B）
+    //   START/OPTIONS/＋：一時停止   VIEW/SHARE/−：タイトルへ   上のボタン：もう一度・設定
     public static partial class GameInput
     {
 #if ENABLE_INPUT_SYSTEM
         static Gamepad Pad => Gamepad.current;
         public static bool PadConnected => Gamepad.current != null;
 
-        // Switch プロコンかどうか。ボタンは位置で読むので、ゲーム中の操作は Xbox と同じ位置になる
-        // （Switch の Y＝攻撃、B＝ジャンプ、A＝回避）。メニューだけは Switch の決まりに合わせて A で決定・B で戻る
-        public static bool PadIsSwitch
+        // Switch プロコンかどうか。メニューだけは Switch の決まりに合わせて A で決定・B で戻る
+        public static bool PadIsSwitch => Style == Binds.PadStyle.Switch;
+
+        // ボタンの表記（Xbox / PS / Switch）
+        public static Binds.PadStyle Style
         {
             get
             {
                 var p = Pad;
-                if (p == null) return false;
+                if (p == null) return Binds.PadStyle.Xbox;
                 var d = p.description;
-                return p.layout.Contains("Switch") || (d.product != null && d.product.Contains("Pro Controller")) || (d.manufacturer != null && d.manufacturer.Contains("Nintendo"));
+                string lay = p.layout ?? "", prod = d.product ?? "", man = d.manufacturer ?? "";
+                if (lay.Contains("Switch") || prod.Contains("Pro Controller") || man.Contains("Nintendo")) return Binds.PadStyle.Switch;
+                if (lay.Contains("DualShock") || lay.Contains("DualSense") || man.Contains("Sony") || prod.Contains("Wireless Controller") || prod.Contains("DualSense")) return Binds.PadStyle.PS;
+                return Binds.PadStyle.Xbox;
             }
         }
 
-        // スティックを倒した瞬間を「押した」として扱う（メニューの左右選択用）
+        static ButtonControl Ctrl(Gamepad p, PadBtn b)
+        {
+            switch (b)
+            {
+                case PadBtn.South: return p.buttonSouth;
+                case PadBtn.East: return p.buttonEast;
+                case PadBtn.West: return p.buttonWest;
+                case PadBtn.North: return p.buttonNorth;
+                case PadBtn.LB: return p.leftShoulder;
+                case PadBtn.RB: return p.rightShoulder;
+                case PadBtn.LT: return p.leftTrigger;
+                case PadBtn.RT: return p.rightTrigger;
+                case PadBtn.LS: return p.leftStickButton;
+                case PadBtn.RS: return p.rightStickButton;
+                case PadBtn.Start: return p.startButton;
+                case PadBtn.Select: return p.selectButton;
+                case PadBtn.DUp: return p.dpad.up;
+                case PadBtn.DDown: return p.dpad.down;
+                case PadBtn.DLeft: return p.dpad.left;
+                case PadBtn.DRight: return p.dpad.right;
+            }
+            return null;
+        }
+
+        // 設定画面用：今押されたボタン（なければ None）
+        public static PadBtn PadPressedNow()
+        {
+            var p = Pad;
+            if (p == null) return PadBtn.None;
+            for (var b = PadBtn.South; b <= PadBtn.DRight; b++)
+            {
+                var c = Ctrl(p, b);
+                if (c != null && c.wasPressedThisFrame) return b;
+            }
+            return PadBtn.None;
+        }
+
+        static bool PadActivity()
+        {
+            var p = Pad;
+            if (p == null) return false;
+            if (PadPressedNow() != PadBtn.None) return true;
+            return p.leftStick.ReadValue().sqrMagnitude > 0.25f || p.rightStick.ReadValue().sqrMagnitude > 0.25f;
+        }
+
+        // スティックを倒した瞬間を「押した」として扱う（メニューの選択用）
         static int stickFrame = -1;
-        static float stickPrevX, stickNowX;
+        static Vector2 stickPrev, stickNow;
         static void UpdateStick()
         {
             if (stickFrame == Time.frameCount || Pad == null) return;
             stickFrame = Time.frameCount;
-            stickPrevX = stickNowX;
-            stickNowX = Pad.leftStick.ReadValue().x;
+            stickPrev = stickNow;
+            stickNow = Pad.leftStick.ReadValue();
+        }
+        static bool Flick(Vector2 dir)
+        {
+            float now = Vector2.Dot(stickNow, dir), prev = Vector2.Dot(stickPrev, dir);
+            return now > 0.6f && prev <= 0.6f;
         }
 
         static bool PadHeld(K k)
         {
             var p = Pad;
             if (p == null) return false;
+            int a = Binds.IndexOf(k);
+            if (a >= 0)
+            {
+                Binds.EnsureLoaded();
+                for (int s = 0; s < Binds.Slots; s++) { var c = Ctrl(p, Binds.Pads[a, s]); if (c != null && c.isPressed) return true; }
+                return false;
+            }
             switch (k)
             {
-                case K.Attack: return p.buttonWest.isPressed;
                 case K.Up: return p.dpad.up.isPressed;
                 case K.Down: return p.dpad.down.isPressed;
                 case K.Left: return p.dpad.left.isPressed;
@@ -62,21 +123,26 @@ namespace AndoBoss
             var p = Pad;
             if (p == null) return false;
             UpdateStick();
+            int a = Binds.IndexOf(k);
+            if (a >= 0)
+            {
+                Binds.EnsureLoaded();
+                for (int s = 0; s < Binds.Slots; s++) { var c = Ctrl(p, Binds.Pads[a, s]); if (c != null && c.wasPressedThisFrame) return true; }
+                return false;
+            }
+            bool sw = PadIsSwitch;
             switch (k)
             {
-                case K.Attack: return p.buttonWest.wasPressedThisFrame;
-                case K.Jump: return p.buttonSouth.wasPressedThisFrame;
-                case K.Confirm: return (PadIsSwitch ? p.buttonEast : p.buttonSouth).wasPressedThisFrame || p.startButton.wasPressedThisFrame;
-                case K.Dodge: return p.buttonEast.wasPressedThisFrame || p.rightTrigger.wasPressedThisFrame;
-                case K.Back: return (PadIsSwitch ? p.buttonSouth : p.buttonEast).wasPressedThisFrame;
-                case K.Skill: return p.rightShoulder.wasPressedThisFrame;
-                case K.Burst: return p.buttonNorth.wasPressedThisFrame || p.leftShoulder.wasPressedThisFrame;
+                case K.Confirm: return (sw ? p.buttonEast : p.buttonSouth).wasPressedThisFrame || p.startButton.wasPressedThisFrame;
+                case K.Back: return (sw ? p.buttonSouth : p.buttonEast).wasPressedThisFrame;
                 case K.Retry: return p.buttonNorth.wasPressedThisFrame;
+                case K.Settings: return p.buttonNorth.wasPressedThisFrame;
                 case K.Pause: return p.startButton.wasPressedThisFrame;
                 case K.Title: return p.selectButton.wasPressedThisFrame;
-                case K.LockOn: return p.rightStickButton.wasPressedThisFrame;
-                case K.Left: return p.dpad.left.wasPressedThisFrame || (stickNowX < -0.6f && stickPrevX >= -0.6f);
-                case K.Right: return p.dpad.right.wasPressedThisFrame || (stickNowX > 0.6f && stickPrevX <= 0.6f);
+                case K.Up: return p.dpad.up.wasPressedThisFrame || Flick(Vector2.up);
+                case K.Down: return p.dpad.down.wasPressedThisFrame || Flick(Vector2.down);
+                case K.Left: return p.dpad.left.wasPressedThisFrame || Flick(Vector2.left);
+                case K.Right: return p.dpad.right.wasPressedThisFrame || Flick(Vector2.right);
             }
             return false;
         }
@@ -106,6 +172,9 @@ namespace AndoBoss
 #else
         public static bool PadConnected => false;
         public static bool PadIsSwitch => false;
+        public static Binds.PadStyle Style => Binds.PadStyle.Xbox;
+        public static PadBtn PadPressedNow() => PadBtn.None;
+        static bool PadActivity() => false;
         static bool PadHeld(K k) => false;
         static bool PadDown(K k) => false;
         static Vector2 PadMove() => Vector2.zero;

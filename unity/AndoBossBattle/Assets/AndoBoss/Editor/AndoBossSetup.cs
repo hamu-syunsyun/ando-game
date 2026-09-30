@@ -72,7 +72,7 @@ namespace AndoBoss.EditorTools
         static void ApplyPlayerSettings()
         {
             PlayerSettings.companyName = "AndoGame";
-            PlayerSettings.productName = "安東先生から単位をもぎとれ ボス戦";
+            PlayerSettings.productName = "先生たちから単位をもぎとれ ボス戦";
             PlayerSettings.colorSpace = ColorSpace.Linear;
             PlayerSettings.defaultScreenWidth = 1920;
             PlayerSettings.defaultScreenHeight = 1080;

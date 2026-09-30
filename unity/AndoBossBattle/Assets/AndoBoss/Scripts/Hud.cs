@@ -38,8 +38,15 @@ namespace AndoBoss
         Image letterTop, letterBot; float letter, letterTarget;
         float bossBarShake;
         Text titlePad;
-        const string PadLineXbox = "コントローラー（Xbox / PS / Switch）：X・□ 攻撃　A・× ジャンプ　B・○ 回避　RB・R1 特技　Y・△ 奥義　START 開始・一時停止";
-        const string PadLineSwitch = "Switch プロコン：Y 攻撃　B ジャンプ　A・ZR 回避　R 特技　X・L 奥義　A 決定　B 戻る　＋ 開始・一時停止";
+        // 操作の表記（キーボードとコントローラーで切りかえる）
+        readonly List<Text> titleRowVals = new List<Text>();
+        Text pauseHelp, selHelp, bossHelp, bossDiff, skillKey, burstKey;
+        RectTransform skillKeyRt, burstKeyRt;
+        readonly List<(Text skill, Text burst)> selSkillLines = new List<(Text, Text)>();
+        // 設定画面
+        RectTransform settings;
+        Text setHelp, setNote;
+        readonly List<(Image bar, Text label, Text[] cells, Text value)> setRows = new List<(Image, Text, Text[], Text)>();
         CanvasGroup subBossGroup;
         Text subBossName;
         RectTransform subBossFill;
@@ -115,12 +122,14 @@ namespace AndoBoss
             BuildBossSelect();
             title = Full(root, "title");
             BuildTitle();
+            settings = Full(root, "settings");
+            BuildSettings();
             result = Full(root, "result");
             BuildResult();
             pause = Full(root, "pause");
             Img(pause, new Color(0, 0, 0, 0.55f));
             Label(pause, "一時停止中", bigFont, 90, Color.white, new Vector2(0, 60), TextAnchor.MiddleCenter, 1000);
-            Label(pause, "クリックで再開　／　T：タイトルへ　／　M：音のオン・オフ", uiFont, 34, new Color(1, 1, 1, 0.9f), new Vector2(0, -50), TextAnchor.MiddleCenter, 1400);
+            pauseHelp = Label(pause, "クリックで再開　／　T：タイトルへ　／　M：音のオン・オフ", uiFont, 34, new Color(1, 1, 1, 0.9f), new Vector2(0, -50), TextAnchor.MiddleCenter, 1400);
             pause.gameObject.SetActive(false);
 
             // バナー・テロップ（いちばん上）
@@ -285,7 +294,7 @@ namespace AndoBoss
             skillCdImg.type = Image.Type.Filled; skillCdImg.fillMethod = Image.FillMethod.Radial360; skillCdImg.fillOrigin = 2;
             skillCdText = Label(skillRt, "", bigFont, 40, Color.white, Vector2.zero, TextAnchor.MiddleCenter, 120);
             Shadowed(skillCdText, Color.black, 2);
-            skillLabel = KeyCap(skillRt, "E", "レポート提出");
+            skillLabel = KeyCap(skillRt, "E", "レポート提出", out skillKey, out skillKeyRt);
 
             // 奥義 Q
             burstRt = New(battle, "burst", br, br, new Vector2(-150, 170), new Vector2(160, 160));
@@ -297,7 +306,7 @@ namespace AndoBoss
             burstIcon = Img(New(burstRt, "icon", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110, 110)), new Color(1, 1, 1, 0.5f), Sprite.Create(Mat.Star, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f)));
             burstLabel = Label(burstRt, "Q", bigFont, 40, Color.white, new Vector2(0, -2), TextAnchor.MiddleCenter, 160);
             Shadowed(burstLabel, new Color(0.2f, 0.05f, 0.35f), 2);
-            burstLabelName = KeyCap(burstRt, "Q", "一夜漬け・雷光乱舞");
+            burstLabelName = KeyCap(burstRt, "Q", "一夜漬け・雷光乱舞", out burstKey, out burstKeyRt);
 
             // コンボ
             comboRt = New(battle, "combo", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-360, 150), new Vector2(400, 200));
@@ -356,11 +365,11 @@ namespace AndoBoss
             letterBot = Img(New(root, "lbBot", Vector2.zero, new Vector2(1, 0), Vector2.zero, new Vector2(0, 0), new Vector2(0.5f, 0)), Color.black);
         }
 
-        Text KeyCap(RectTransform parent, string key, string name)
+        Text KeyCap(RectTransform parent, string key, string name, out Text keyText, out RectTransform keyRt)
         {
-            var k = New(parent, "key", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, -6), new Vector2(40, 34));
+            var k = keyRt = New(parent, "key", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, -6), new Vector2(40, 34));
             Img(k, new Color(1, 1, 1, 0.92f), Mat.RoundSprite).type = Image.Type.Sliced;
-            Label(k, key, uiFont, 22, new Color(0.15f, 0.1f, 0.25f), Vector2.zero, TextAnchor.MiddleCenter, 40);
+            keyText = Label(k, key, uiFont, 22, new Color(0.15f, 0.1f, 0.25f), Vector2.zero, TextAnchor.MiddleCenter, 200);
             var n = Label(parent, name, uiFont, 20, Color.white, new Vector2(0, -parent.sizeDelta.y / 2 - 40), TextAnchor.MiddleCenter, 260);
             Shadowed(n, new Color(0, 0, 0, 0.8f), 1);
             return n;
@@ -420,11 +429,11 @@ namespace AndoBoss
         {
             Img(New(title, "shade", Vector2.zero, new Vector2(0.62f, 1), Vector2.zero, Vector2.zero, Vector2.zero), new Color(0.05f, 0.02f, 0.15f, 0.45f), Mat.GlowSprite);
             titleBlock = New(title, "block", new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(620, 120), new Vector2(1100, 500));
-            titleSmall = Label(titleBlock, "安東先生から", bigFont, 72, Color.white, new Vector2(-150, 150), TextAnchor.MiddleCenter, 1000, 110);
+            titleSmall = Label(titleBlock, "先生たちから", bigFont, 72, Color.white, new Vector2(-150, 150), TextAnchor.MiddleCenter, 1000, 110);
             Shadowed(titleSmall, new Color(0.3f, 0.1f, 0.55f), 4);
             titleBig = Label(titleBlock, "単位をもぎとれ！", bigFont, 118, Mat.Gold, new Vector2(0, 30), TextAnchor.MiddleCenter, 1300, 160);
             Shadowed(titleBig, new Color(0.45f, 0.12f, 0.1f), 6);
-            titleSub = Label(titleBlock, "〜 電気回路 期末ボス決戦 〜", uiFont, 44, Mat.ElectroLight, new Vector2(0, -80), TextAnchor.MiddleCenter, 1100);
+            titleSub = Label(titleBlock, "〜 期末ボス決戦 〜", uiFont, 44, Mat.ElectroLight, new Vector2(0, -80), TextAnchor.MiddleCenter, 1100);
             Shadowed(titleSub, new Color(0.15f, 0.05f, 0.3f), 3);
             titlePrompt = Label(title, "クリック・Enter・A（×）ボタンで開始", uiFont, 44, Color.white, new Vector2(-340, -250), TextAnchor.MiddleCenter, 1100);
             Shadowed(titlePrompt, new Color(0.2f, 0.05f, 0.4f), 3);
@@ -434,19 +443,13 @@ namespace AndoBoss
             var panel = New(title, "howto", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-330, -40), new Vector2(560, 620));
             Img(panel, new Color(0.06f, 0.04f, 0.14f, 0.72f), Mat.RoundSprite).type = Image.Type.Sliced;
             Label(panel, "操作方法", uiFont, 36, Mat.Gold, new Vector2(0, 260), TextAnchor.MiddleCenter, 500);
-            string[,] rows =
+            for (int i = 0; i < TitleRows.Length; i++)
             {
-                { "移動", "W A S D" }, { "視点", "マウス" }, { "通常攻撃", "左クリック / J" }, { "特技", "E" },
-                { "奥義", "Q（やる気満タン）" }, { "キャラ選択", "開始前に ← →" }, { "回避", "Shift / 右クリック" }, { "ジャンプ", "Space" },
-                { "光の強さ・画風", "F2 ・ F3" }, { "一時停止", "Esc" },
-            };
-            for (int i = 0; i < rows.GetLength(0); i++)
-            {
-                Label(panel, rows[i, 0], uiFont, 24, Color.white, new Vector2(-40, 205 - i * 42), TextAnchor.MiddleLeft, 400);
-                Label(panel, rows[i, 1], uiFont, 24, Mat.ElectroLight, new Vector2(40, 205 - i * 42), TextAnchor.MiddleRight, 400);
+                Label(panel, TitleRows[i], uiFont, 24, Color.white, new Vector2(-40, 212 - i * 42), TextAnchor.MiddleLeft, 400);
+                titleRowVals.Add(Label(panel, "", uiFont, 24, Mat.ElectroLight, new Vector2(40, 212 - i * 42), TextAnchor.MiddleRight, 400));
             }
             Label(panel, "ジャスト回避とブレイクを狙え！\nエナジードリンクを拾うと回復！", uiFont, 21, new Color(1, 0.9f, 0.6f), new Vector2(0, -255), TextAnchor.MiddleCenter, 540, 70);
-            var pad = titlePad = Label(title, PadLineXbox, uiFont, 22, new Color(1, 1, 1, 0.85f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
+            var pad = titlePad = Label(title, "", uiFont, 24, new Color(1, 1, 1, 0.85f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
             Anchor(pad.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 70));
             Shadowed(pad, new Color(0, 0, 0, 0.8f), 2);
             var credit = Label(title, "音楽・効果音・グラフィックはすべてプログラムで生成しています。安東先生・菅原先生は架空の人物です。", uiFont, 20, new Color(1, 1, 1, 0.7f), Vector2.zero, TextAnchor.MiddleCenter, 1800);
@@ -474,7 +477,7 @@ namespace AndoBoss
             resTotal = Label(panel, "", bigFont, 64, Mat.Gold, new Vector2(0, -280), TextAnchor.MiddleCenter, 860, 90);
             Shadowed(resTotal, new Color(0.4f, 0.2f, 0), 3);
             resRecord = Label(panel, "NEW RECORD!", bigFont, 36, new Color(1, 0.45f, 0.5f), new Vector2(270, -330), TextAnchor.MiddleCenter, 500);
-            resPrompt = Label(result, "R：もう一度　　T：タイトルへ", uiFont, 36, Color.white, new Vector2(0, -470), TextAnchor.MiddleCenter, 1200);
+            resPrompt = Label(result, "", uiFont, 36, Color.white, new Vector2(0, -470), TextAnchor.MiddleCenter, 1200);
             Shadowed(resPrompt, new Color(0, 0, 0, 0.8f), 2);
 
             resGradeRt = New(result, "grade", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(520, 110), new Vector2(360, 360));
@@ -491,24 +494,24 @@ namespace AndoBoss
         {
             var head = Label(select, "最初に使うキャラクターを選んでください", uiFont, 44, Color.white, new Vector2(0, 450), TextAnchor.MiddleCenter, 1600);
             Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
-            var help = Label(select, "← → か 1・2・3 で選ぶ　／　Enter・クリックで決定　（戦闘中は交代できません。選んだキャラで最後まで戦います）", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
+            var help = selHelp = Label(select, "", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
             Shadowed(help, new Color(0, 0, 0, 0.8f), 2);
             for (int i = 0; i < CharDef.All.Length; i++)
             {
                 var d = CharDef.All[i];
-                var card = New(select, "card" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 590, -290), new Vector2(560, 380));
+                var card = New(select, "card" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(SelCardX(i), -290), new Vector2(440, 380));
                 var border = Img(card, d.ElemColor, Mat.RoundSprite); border.type = Image.Type.Sliced;
                 var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
                 bg.type = Image.Type.Sliced;
-                var nm = Label(card, d.Name, bigFont, 50, Color.white, new Vector2(-10, 140), TextAnchor.MiddleLeft, 460, 80);
+                var nm = Label(card, d.Name, bigFont, 44, Color.white, new Vector2(-15, 140), TextAnchor.MiddleLeft, 370, 80);
                 Shadowed(nm, Color.Lerp(d.ElemColor, Color.black, 0.5f), 3);
-                var dot = Img(New(card, "dot", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(225, 140), new Vector2(56, 56)), d.ElemColor, Mat.CircleSprite);
+                var dot = Img(New(card, "dot", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(175, 140), new Vector2(52, 52)), d.ElemColor, Mat.CircleSprite);
                 Label(dot.rectTransform, Elements.Kanji(d.Elem), uiFont, 30, new Color(0.1f, 0.05f, 0.15f), Vector2.zero, TextAnchor.MiddleCenter, 60);
-                string weapon = d.Weapon == Weapon.Sword ? "片手剣" : d.Weapon == Weapon.Fist ? "拳" : "弓";
-                Label(card, $"{d.Title}　／　{Elements.Kanji(d.Elem)}・{weapon}", uiFont, 24, d.ElemColor, new Vector2(0, 85), TextAnchor.MiddleCenter, 520);
-                Label(card, $"E 特技：{d.SkillName}", uiFont, 26, Color.white, new Vector2(0, 30), TextAnchor.MiddleLeft, 500);
-                Label(card, $"Q 奥義：{d.BurstName}", uiFont, 26, Color.white, new Vector2(0, -20), TextAnchor.MiddleLeft, 500);
-                var pas = Label(card, d.Passive != "" ? "能力　" + d.Passive : (d.AtkMul > 1 ? "" : ""), uiFont, 21, Mat.Gold, new Vector2(0, -95), TextAnchor.UpperLeft, 500, 90);
+                Label(card, $"{d.Title}　／　{Elements.Kanji(d.Elem)}・{d.WeaponName}", uiFont, 21, d.ElemColor, new Vector2(0, 85), TextAnchor.MiddleCenter, 420);
+                var sk = Label(card, $"E 特技：{d.SkillName}", uiFont, 22, Color.white, new Vector2(0, 32), TextAnchor.MiddleLeft, 400);
+                var bu = Label(card, $"Q 奥義：{d.BurstName}", uiFont, 22, Color.white, new Vector2(0, -12), TextAnchor.MiddleLeft, 400);
+                selSkillLines.Add((sk, bu));
+                var pas = Label(card, d.Passive != "" ? "能力　" + d.Passive : "", uiFont, 19, Mat.Gold, new Vector2(0, -100), TextAnchor.UpperLeft, 400, 110);
                 pas.horizontalOverflow = HorizontalWrapMode.Wrap;
                 selCards.Add((card, bg, border));
             }
@@ -529,12 +532,14 @@ namespace AndoBoss
         {
             var head = Label(bossSel, "たおす先生を選んでください", uiFont, 44, Color.white, new Vector2(0, 450), TextAnchor.MiddleCenter, 1600);
             Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
-            var help = Label(bossSel, "← → か 1・2・3 で選ぶ　／　Enter・クリックで決定　／　T でタイトルへ", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
+            bossDiff = Label(bossSel, "", uiFont, 30, Color.white, new Vector2(0, -478), TextAnchor.MiddleCenter, 1800);
+            Shadowed(bossDiff, new Color(0, 0, 0, 0.8f), 2);
+            var help = bossHelp = Label(bossSel, "", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -515), TextAnchor.MiddleCenter, 1800);
             Shadowed(help, new Color(0, 0, 0, 0.8f), 2);
             for (int i = 0; i < BossInfo.GetLength(0); i++)
             {
                 ColorUtility.TryParseHtmlString(BossInfo[i, 3], out var c);
-                var card = New(bossSel, "boss" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * BossCardGap, -290), new Vector2(570, 360));
+                var card = New(bossSel, "boss" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * BossCardGap, -262), new Vector2(570, 360));
                 var border = Img(card, c, Mat.RoundSprite); border.type = Image.Type.Sliced;
                 var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
                 bg.type = Image.Type.Sliced;
@@ -562,8 +567,123 @@ namespace AndoBoss
 
         void ShowOnly(RectTransform which)
         {
-            foreach (var r in new[] { battle, title, result, select, bossSel })
+            foreach (var r in new[] { battle, title, result, select, bossSel, settings })
                 r.gameObject.SetActive(r == which);
+        }
+
+        // ---------------- 操作の表記 ----------------
+        static float SelCardX(int i) => (i - (CharDef.All.Length - 1) / 2f) * 462;
+
+        static readonly string[] TitleRows = { "移動", "視点", "通常攻撃", "特技", "奥義（やる気満タン）", "回避", "ジャンプ", "ロックオン", "一時停止", "光の強さ・画風", "操作設定・難易度" };
+
+        void UpdateTitleLabels()
+        {
+            bool pad = GameInput.UsingPad;
+            string L(GameInput.K k) => GameInput.Label(k);
+            string[] v =
+            {
+                pad ? "左スティック" : "W A S D", pad ? "右スティック" : "マウス", L(GameInput.K.Attack), L(GameInput.K.Skill), L(GameInput.K.Burst),
+                L(GameInput.K.Dodge), L(GameInput.K.Jump), L(GameInput.K.LockOn), L(GameInput.K.Pause), "F2 ・ F3", L(GameInput.K.Settings),
+            };
+            for (int i = 0; i < titleRowVals.Count; i++) titleRowVals[i].text = v[i];
+            titlePrompt.text = pad ? $"{L(GameInput.K.Confirm)} ボタンで開始" : "クリック・Enter で開始";
+            titlePad.text = pad
+                ? $"{L(GameInput.K.Settings)} ボタン：操作設定・難易度　／　Xbox・PS・Switch プロコンに対応"
+                : $"{L(GameInput.K.Settings)} キー：操作設定・難易度（キー配置の変更・プリセット登録）　／　コントローラーにも対応";
+        }
+
+        string HintLine()
+        {
+            string L(GameInput.K k) => GameInput.Label(k);
+            if (GameInput.UsingPad)
+                return $"左スティック 移動　右スティック 視点　{L(GameInput.K.Attack)} 攻撃\n{L(GameInput.K.Jump)} ジャンプ　{L(GameInput.K.Dodge)} 回避　{L(GameInput.K.Skill)} 特技\n{L(GameInput.K.Burst)} 奥義　{L(GameInput.K.LockOn)} ロックオン　{L(GameInput.K.Pause)} 一時停止";
+            return $"WASD 移動　{L(GameInput.K.Attack)} 攻撃　{L(GameInput.K.Skill)} 特技\n{L(GameInput.K.Burst)} 奥義　{L(GameInput.K.Dodge)} 回避　{L(GameInput.K.Jump)} ジャンプ\n{L(GameInput.K.LockOn)} ロックオン　F2 光　F3 画風　Esc 一時停止";
+        }
+
+        static void SetKeyCap(Text t, RectTransform rt, string s)
+        {
+            t.text = s;
+            rt.sizeDelta = new Vector2(Mathf.Max(40, t.preferredWidth + 18), 34);
+        }
+
+        // ---------------- 設定画面 ----------------
+        static float SetColX(int c) => -170 + c * 270;
+
+        void BuildSettings()
+        {
+            Img(settings, new Color(0.03f, 0.02f, 0.08f, 0.55f));
+            var panel = New(settings, "panel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(1560, 960));
+            Img(panel, new Color(0.08f, 0.06f, 0.16f, 0.93f), Mat.RoundSprite).type = Image.Type.Sliced;
+            var head = Label(panel, "設定", bigFont, 64, Mat.Gold, new Vector2(0, 410), TextAnchor.MiddleCenter, 1400, 90);
+            Shadowed(head, new Color(0.35f, 0.1f, 0.55f), 4);
+            string[] ch = { "キーボード・マウス 1", "キーボード・マウス 2", "コントローラー 1", "コントローラー 2" };
+            for (int c = 0; c < 4; c++) Label(panel, ch[c], uiFont, 22, new Color(0.75f, 0.8f, 1f), new Vector2(SetColX(c), 318), TextAnchor.MiddleCenter, 260);
+            for (int r = 0; r <= Game.RowBack; r++)
+            {
+                float y = 262 - r * 52;
+                var bar = Img(New(panel, "row" + r, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, y), new Vector2(1480, 46)), new Color(1, 1, 1, 0), Mat.RoundSprite);
+                bar.type = Image.Type.Sliced;
+                var label = Label(panel, "", uiFont, 28, Color.white, new Vector2(-560, y), TextAnchor.MiddleLeft, 340);
+                var cells = new Text[4];
+                for (int c = 0; c < 4; c++) cells[c] = Label(panel, "", uiFont, 26, Color.white, new Vector2(SetColX(c), y), TextAnchor.MiddleCenter, 260);
+                var value = Label(panel, "", uiFont, 28, Color.white, new Vector2(235, y), TextAnchor.MiddleCenter, 1060);
+                setRows.Add((bar, label, cells, value));
+            }
+            setNote = Label(panel, "", uiFont, 24, new Color(1, 0.9f, 0.6f), new Vector2(0, -345), TextAnchor.MiddleCenter, 1480, 70);
+            setHelp = Label(panel, "", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -415), TextAnchor.MiddleCenter, 1480);
+            settings.gameObject.SetActive(false);
+        }
+
+        public void ShowSettings() => ShowOnly(settings);
+
+        void UpdateSettingsView(Game G)
+        {
+            Binds.EnsureLoaded();
+            var st = GameInput.Style;
+            bool blink = Mathf.Repeat(Time.unscaledTime * 2, 1) < 0.6f;
+            for (int r = 0; r < setRows.Count; r++)
+            {
+                var row = setRows[r];
+                bool sel = r == G.SetRow;
+                row.bar.color = sel ? new Color(0.75f, 0.55f, 1f, 0.25f) : new Color(1, 1, 1, r % 2 == 0 ? 0.035f : 0);
+                row.label.color = sel ? Mat.Gold : Color.white;
+                bool act = r >= Game.RowAct0 && r < Game.RowRegister;
+                if (act)
+                {
+                    int a = r - Game.RowAct0;
+                    row.label.text = Binds.ActionNames[a];
+                    row.value.text = "";
+                    for (int c = 0; c < 4; c++)
+                    {
+                        string t = c < 2 ? Binds.KeyName(Binds.Keys[a, c]) : Binds.PadName(Binds.Pads[a, c - 2], st);
+                        bool on = sel && c == G.SetCol;
+                        if (on && G.SetWaiting) t = c >= 2 && !GameInput.PadConnected ? "つないでね" : (blink ? "押してください…" : "");
+                        else if (on) t = $"［ {t} ］";
+                        row.cells[c].text = t;
+                        row.cells[c].color = on ? Mat.Gold : c >= 2 ? new Color(0.75f, 0.9f, 1f) : Color.white;
+                    }
+                    continue;
+                }
+                foreach (var c in row.cells) c.text = "";
+                row.value.color = sel ? Mat.Gold : Color.white;
+                if (r == Game.RowDiff) { row.label.text = "難易度"; row.value.text = $"◀　{Game.DiffNames[Game.Difficulty]}　▶"; }
+                else if (r == Game.RowPreset) { row.label.text = "プリセット"; row.value.text = $"◀　{Binds.PresetName(G.SetPreset)}　▶　<size=22>（決定で読みこむ）</size>"; }
+                else if (r == Game.RowRegister) { row.label.text = "マイ設定に登録"; row.value.text = $"◀　マイ設定{G.SetSlot + 1}{(Binds.HasCustom(G.SetSlot) ? "（上書き）" : "（空き）")}　▶　<size=22>（決定で今の操作を保存）</size>"; }
+                else if (r == Game.RowReset) { row.label.text = "初期設定にもどす"; row.value.text = "決定で「標準」の操作にもどす"; }
+                else { row.label.text = "もどる"; row.value.text = "決定でタイトルへ"; }
+            }
+            int sr = G.SetRow;
+            setNote.text = sr == Game.RowDiff ? Game.DiffNotes[Game.Difficulty]
+                : sr == Game.RowPreset ? "組み込みの4種類と、自分で登録した「マイ設定」3つから選べます"
+                : sr == Game.RowRegister ? "今の割り当てを名前つき（マイ設定1〜3）で保存します。あとで「プリセット」から呼び出せます"
+                : sr >= Game.RowAct0 && sr < Game.RowRegister
+                    ? (G.SetWaiting
+                        ? (G.SetCol < 2 ? "割り当てたいキーかマウスボタンを押してください（Delete で外す・Esc でやめる）" : "割り当てたいボタンを押してください（VIEW/SHARE/− で外す・START/OPTIONS/＋ でやめる）")
+                        : "決定を押してから、割り当てたいキー（ボタン）を押します。同じキーがほかの操作にあったら、そちらは外れます")
+                : "";
+            setHelp.text = GameInput.UsingPad
+                ? $"十字キー・スティックで選ぶ　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} でもどる"
+                : "↑ ↓ ← → で選ぶ　／　Enter・クリックで決定　／　Esc・BS でもどる";
         }
 
         // ================= 外から呼ぶ =================
@@ -720,7 +840,7 @@ namespace AndoBoss
                 d.win ? $"残りHPボーナス|+{d.hpBonus}" : "残りHPボーナス|―",
                 $"ジャスト回避 ×{d.perfects}|+{d.perfectBonus}",
                 $"最大コンボ {d.maxCombo}|+{d.comboBonus}",
-                $"使ったキャラ|{d.charName}",
+                $"キャラ（難易度）|{d.charName}",
             };
             for (int i = 0; i < resRows.Count; i++)
             {
@@ -812,7 +932,7 @@ namespace AndoBoss
             if (title.gameObject.activeSelf)
             {
                 titleT += dt;
-                titlePad.text = GameInput.PadIsSwitch ? PadLineSwitch : PadLineXbox;
+                UpdateTitleLabels();
                 float e = Mathf.Clamp01(titleT / 0.6f);
                 titleBlock.anchoredPosition = new Vector2(620 - (1 - e) * (1 - e) * 400, 120 + Mathf.Sin(titleT * 1.5f) * 6);
                 titleBig.transform.localScale = Vector3.one * (1 + Mathf.Max(0, Mathf.Sin(titleT * 3)) * 0.03f);
@@ -847,9 +967,20 @@ namespace AndoBoss
             bool hideUi = G.State == Game.Mode.Intro || G.Cinematic;
             battleGroup.alpha = Mathf.MoveTowards(battleGroup.alpha, hideUi ? 0 : 1, dt * 4);
             if (battle.gameObject.activeSelf) UpdateBattle(dt, G);
+            if (settings.gameObject.activeSelf) UpdateSettingsView(G);
+            if (pause.gameObject.activeSelf)
+                pauseHelp.text = GameInput.UsingPad
+                    ? $"{GameInput.Label(GameInput.K.Confirm)} で再開　／　{GameInput.Label(GameInput.K.Title)}：タイトルへ"
+                    : "クリック・Enter で再開　／　T：タイトルへ　／　M：音のオン・オフ";
+            if (result.gameObject.activeSelf) resPrompt.text = $"{GameInput.Label(GameInput.K.Retry)}：もう一度　　{GameInput.Label(GameInput.K.Title)}：タイトルへ";
             if (bossSel.gameObject.activeSelf)
             {
                 bossT += dt;
+                var dc = new[] { new Color(0.55f, 1f, 0.7f), Color.white, new Color(1f, 0.7f, 0.4f), new Color(1f, 0.35f, 0.4f) }[Game.Difficulty];
+                bossDiff.text = $"難易度：<color=#{ColorUtility.ToHtmlStringRGB(dc)}>◀ {Game.DiffNames[Game.Difficulty]} ▶</color>　<size=22>{Game.DiffNotes[Game.Difficulty]}</size>";
+                bossHelp.text = GameInput.UsingPad
+                    ? $"十字キー ← → で先生、↑ ↓ で難易度　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} でタイトルへ"
+                    : "← → か 1・2・3 で先生、↑ ↓ で難易度　／　Enter・クリックで決定　／　BS でタイトルへ";
                 for (int i = 0; i < bossCards.Count; i++)
                 {
                     bool on = i == bossIdx;
@@ -858,12 +989,15 @@ namespace AndoBoss
                     ColorUtility.TryParseHtmlString(BossInfo[i, 3], out var bc);
                     c.border.color = on ? bc : new Color(bc.r, bc.g, bc.b, 0.25f);
                     c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
-                    c.rt.anchoredPosition = new Vector2((i - 1) * BossCardGap, -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - bossT * 3) * 300);
+                    c.rt.anchoredPosition = new Vector2((i - 1) * BossCardGap, -262 + (on ? 14 : 0) - Mathf.Max(0, 1 - bossT * 3) * 300);
                 }
             }
             if (select.gameObject.activeSelf)
             {
                 selT += dt;
+                selHelp.text = GameInput.UsingPad
+                    ? $"十字キー・スティックで選ぶ　／　{GameInput.Label(GameInput.K.Confirm)} で決定　／　{GameInput.Label(GameInput.K.Back)} で戻る　（戦闘中は交代できません）"
+                    : "← → か 1〜4 で選ぶ　／　Enter・クリックで決定　／　BS で戻る　（戦闘中は交代できません）";
                 for (int i = 0; i < selCards.Count; i++)
                 {
                     bool on = i == selIdx;
@@ -873,7 +1007,9 @@ namespace AndoBoss
                     var ec = CharDef.All[i].ElemColor;
                     c.border.color = on ? ec : new Color(ec.r, ec.g, ec.b, 0.25f);
                     c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
-                    c.rt.anchoredPosition = new Vector2((i - 1) * 590, -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - selT * 3) * 300);
+                    c.rt.anchoredPosition = new Vector2(SelCardX(i), -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - selT * 3) * 300);
+                    selSkillLines[i].skill.text = $"{GameInput.ShortLabel(GameInput.K.Skill)} 特技：{CharDef.All[i].SkillName}";
+                    selSkillLines[i].burst.text = $"{GameInput.ShortLabel(GameInput.K.Burst)} 奥義：{CharDef.All[i].BurstName}";
                 }
             }
             // 字幕（登場演出・決着の演出中も出す。結果画面では消す）
@@ -964,11 +1100,11 @@ namespace AndoBoss
             burstRing.color = ready ? Color.Lerp(ec, Color.white, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8)) : ec;
             burstGlow.color = new Color(ec.r, ec.g, ec.b, ready ? 0.5f + 0.25f * Mathf.Sin(Time.unscaledTime * 6) : 0);
 
-            hintText.text = GameInput.PadIsSwitch
-                ? "左スティック 移動　右スティック 視点　Y 攻撃\nB ジャンプ　A・ZR 回避　R 特技\nX・L 奥義　R押しこみ ロックオン　＋ 一時停止"
-                : GameInput.PadConnected
-                ? "左スティック 移動　右スティック 視点　X・□ 攻撃\nA・× ジャンプ　B・○ 回避　RB・R1 特技\nY・△ 奥義　R3 ロックオン　START 一時停止"
-                : "WASD 移動　クリック/J 攻撃　E 特技　Q 奥義\nShift 回避　Space ジャンプ　Tab ロックオン\nF2 光　F3 画風　Esc 一時停止";
+            hintText.text = HintLine();
+            SetKeyCap(skillKey, skillKeyRt, GameInput.ShortLabel(GameInput.K.Skill));
+            SetKeyCap(burstKey, burstKeyRt, GameInput.ShortLabel(GameInput.K.Burst));
+            burstLabel.text = GameInput.ShortLabel(GameInput.K.Burst);
+            burstLabel.fontSize = burstLabel.text.Length > 3 ? 26 : 40;
             playerName.text = P.Def.Passive.StartsWith("留年") && !G.ReviveUsed ? $"{P.Def.Name}　Lv.90　<color=#ffd54d>留年×1</color>" : $"{P.Def.Name}　Lv.90";
             slowText.text = G.SlowT > 0 ? $"鈍足（トランス）　{G.SlowT:0.0}" : "";
             swapFlash = Mathf.MoveTowards(swapFlash, 0, dt * 3);

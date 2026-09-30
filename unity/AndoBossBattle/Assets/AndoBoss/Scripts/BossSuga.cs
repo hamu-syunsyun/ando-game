@@ -36,6 +36,9 @@ namespace AndoBoss
             { "morau", new[] { "（カウントを）もらってみる？？", "カウント、もらってみる？？" } },
             { "wall", new[] { "英検準2級も取れない人は……ピーーーーッ（自主規制）", "英検準2級も取れないの？論外。", "英検の壁、越えられる？" } },
             { "hakai", new[] { "北の破壊神、と呼ばれています。", "ここから先は、破壊の時間。" } },
+            { "sheets", new[] { "答案、返すね。……赤いのは全部カウント。", "はい、返却。何点だった？" } },
+            { "listen", new[] { "Listen carefully.", "リスニング、始めます。聞き逃したらカウント。" } },
+            { "redpen", new[] { "赤ペン添削の時間です。", "ここも、ここも、まちがい。" } },
         };
         static string SPick(string k) { var a = SugaLines[k]; return a[Random.Range(0, a.Length)]; }
 
@@ -151,7 +154,7 @@ namespace AndoBoss
         void PickSugaAttack()
         {
             if (Phase == 2) hakaiCd -= 1;
-            var opts = new List<string> { "count", "scythe", "words", "morau", "wall" };
+            var opts = new List<string> { "count", "scythe", "words", "morau", "wall", "sheets", "listen", "redpen" };
             if (Phase == 2) { opts.Add("count"); opts.Add("wall"); }
             opts.RemoveAll(k => k == lastAtk);
             if (Phase == 2 && hakaiCd <= 0) { opts.Clear(); opts.Add("hakai"); hakaiCd = 5; }
@@ -165,6 +168,9 @@ namespace AndoBoss
                 case "words": atk = AtkWords(); break;
                 case "morau": atk = AtkMorau(); break;
                 case "wall": atk = AtkWall(); break;
+                case "sheets": atk = AtkSheets(); break;
+                case "listen": atk = AtkListen(); break;
+                case "redpen": atk = AtkRedPen(); break;
                 default: atk = AtkHakai(); break;
             }
         }
@@ -435,6 +441,129 @@ namespace AndoBoss
                 if (Random.value < 0.4f) Fx.Debris(dir * along + side * Random.Range(-15f, 15f), new Color(0.8f, 0.75f, 0.64f), 1);
                 return along < World.ArenaR + 2 && Alive;
             }, root);
+        }
+
+        // ---- 答案返却：赤い×のついた答案が弧を描いて飛び、ブーメランのように戻ってくる ----
+        Func<float, bool> AtkSheets()
+        {
+            Speak(SPick("sheets"), 2.8f);
+            Pose = "point";
+            int n = Phase == 2 ? 5 : 3;
+            var P = Game.I.Player;
+            float bas = Mathf.Atan2(P.Pos.x - Pos.x, P.Pos.z - Pos.z);
+            Sfx.Play("paper", 1f, 0.8f);
+            for (int i = 0; i < n; i++)
+            {
+                int k = i;
+                Fx.Later(0.35f + k * 0.18f, () => { if (Alive && Game.I.State == Game.Mode.Battle) ThrowSheet(bas + (k - (n - 1) / 2f) * 0.45f, k % 2 == 0 ? 1 : -1); });
+            }
+            float t = 0;
+            return dt => (t += dt) < 1.2f + n * 0.18f;
+        }
+
+        void ThrowSheet(float angle, int curve)
+        {
+            var g = new GameObject("sheet");
+            Mat.Part(g.transform, Mat.Cube, Mat.ToonShared(new Color(0.97f, 0.97f, 0.94f), 0.01f), Vector3.zero, new Vector3(1.1f, 0.03f, 1.5f), default, false);
+            var red = Mat.FxShared(new Color(SugaRed.r, SugaRed.g, SugaRed.b, 1f), Mat.White, true, 2.5f);
+            Mat.Part(g.transform, Mat.Cube, red, new Vector3(0, 0.03f, 0), new Vector3(0.9f, 0.02f, 0.12f), new Vector3(0, 45, 0), false);
+            Mat.Part(g.transform, Mat.Cube, red, new Vector3(0, 0.03f, 0), new Vector3(0.9f, 0.02f, 0.12f), new Vector3(0, -45, 0), false);
+            var glow = Mat.Part(g.transform, Mat.Quad, Mat.FxShared(new Color(1f, 0.3f, 0.35f, 0.6f), Mat.Glow, true, 2f), Vector3.zero, Vector3.one * 2.2f, default, false);
+            glow.AddComponent<Billboard>();
+            var origin = new Vector3(Pos.x, 1.2f, Pos.z);
+            var dir = new Vector3(Mathf.Sin(angle), 0, Mathf.Cos(angle));
+            var side = new Vector3(dir.z, 0, -dir.x) * curve;
+            const float T = 2.4f, R = 16f;
+            float t = 0; bool hit = false;
+            Fx.Run(dt =>
+            {
+                t += dt;
+                float u = t / T;
+                var p = origin + dir * (Mathf.Sin(u * Mathf.PI) * R) + side * (Mathf.Sin(u * Mathf.PI * 2) * 3.5f);
+                g.transform.position = p;
+                g.transform.rotation = Quaternion.Euler(0, t * 900, 0);
+                if (Random.value < 0.3f) Fx.Sparks(p, SugaRed, 1, 0.3f);
+                var P = Game.I.Player;
+                if (!hit && new Vector2(p.x - P.Pos.x, p.z - P.Pos.z).magnitude < 1.0f && P.Pos.y < 1.9f)
+                    hit = HitWithCount(90, p);
+                return u < 1 && Alive;
+            }, g);
+        }
+
+        // ---- リスニングテスト：音の輪が何重にも広がる。ジャンプでよける ----
+        Func<float, bool> AtkListen()
+        {
+            Speak(SPick("listen"), 2.8f);
+            Pose = "raise";
+            int waves = Phase == 2 ? 4 : 3;
+            for (int i = 0; i < waves; i++)
+            {
+                int k = i;
+                Fx.Later(0.7f + k * 0.75f, () =>
+                {
+                    if (!Alive || Game.I.State != Game.Mode.Battle) return;
+                    var center = Player.Flat(Pos);
+                    bool hit = false;
+                    Sfx.Play("wave", 0.8f, 1.3f - k * 0.08f);
+                    Sfx.Play("whisper" + Random.Range(0, 3), 0.5f, 1.2f);
+                    Game.I.Hud.WorldText(Pos + Vector3.up * 5.5f, k % 2 == 0 ? "Listen!" : "♪", SugaPurple, 1f);
+                    Fx.ShockWall(center, SugaPurple, (r, dt) =>
+                    {
+                        var P = Game.I.Player;
+                        float d = Player.Flat(P.Pos - center).magnitude;
+                        if (!hit && Mathf.Abs(d - r) < 0.6f && P.Pos.y < 0.55f) hit = HitWithCount(110, center);
+                        return Alive;
+                    });
+                });
+            }
+            float t = 0;
+            return dt => (t += dt) < 1.0f + waves * 0.75f;
+        }
+
+        // ---- 赤ペン添削：アリーナに赤ペンの線が引かれ、線にそって爆発する ----
+        Func<float, bool> AtkRedPen()
+        {
+            Speak(SPick("redpen"), 2.8f);
+            Pose = "point";
+            int n = Phase == 2 ? 5 : 3;
+            var P = Game.I.Player;
+            Sfx.Play("warn", 0.6f, 0.9f);
+            for (int i = 0; i < n; i++)
+            {
+                int k = i;
+                Fx.Later(k * 0.3f, () =>
+                {
+                    if (!Alive || Game.I.State != Game.Mode.Battle) return;
+                    var pp = Player.Flat(Game.I.Player.Pos);
+                    float a = Random.value * Mathf.PI;
+                    var dir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+                    var nrm = new Vector3(dir.z, 0, -dir.x);
+                    // 1本目はプレイヤーの真上、あとは少しずらす
+                    var center = pp + nrm * (k == 0 ? 0 : Random.Range(-4f, 4f));
+                    var from = center - dir * 26f;
+                    Fx.TelegraphBand(from, dir, 52f, 2.2f, 1.0f);
+                    Fx.Later(1.0f, () =>
+                    {
+                        if (!Alive || Game.I.State != Game.Mode.Battle) return;
+                        Sfx.Play("slash3", 0.8f, 0.7f);
+                        Sfx.Play("explode", 0.5f, 1.3f);
+                        for (float s = -24; s <= 24; s += 3f)
+                        {
+                            var q = center + dir * s;
+                            if (q.magnitude > World.ArenaR) continue;
+                            Fx.Explosion(q + Vector3.up * 0.4f, SugaRed, 0.45f);
+                        }
+                        Fx.SlashLine(center + Vector3.up * 0.6f, SugaRed, 20f);
+                        Game.I.Cam.Shake(0.25f);
+                        var pl = Game.I.Player.Pos;
+                        var rel = Player.Flat(pl) - center;
+                        float dist = Mathf.Abs(Vector3.Dot(rel, nrm));
+                        if (dist < 1.3f && pl.y < 1.8f) HitWithCount(120, Player.Flat(pl) - nrm * Mathf.Sign(Vector3.Dot(rel, nrm)));
+                    });
+                });
+            }
+            float t = 0;
+            return dt => (t += dt) < 1.3f + n * 0.3f;
         }
 
         // ---- 北の破壊神（本気モードの必殺）：空から破壊の柱を5回落とす ----

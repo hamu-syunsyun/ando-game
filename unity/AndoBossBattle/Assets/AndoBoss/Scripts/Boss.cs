@@ -212,7 +212,7 @@ namespace AndoBoss
 
         public void ResetState()
         {
-            HpMax = Game.IsDouble ? DoubleHp : MaxHp;
+            HpMax = (Game.IsDouble ? DoubleHp : MaxHp) * Game.BossHpMul;
             Pos = HomePos; Y = 0; Face = Mathf.PI; Hp = HpMax; LagHp = HpMax; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
             Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; Aura = Elem.None; AuraT = 0; hakaiCd = 2f; PoseU = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
             restT = 1.2f; lastAtk = null; atk = null;
@@ -315,7 +315,7 @@ namespace AndoBoss
                 if (!atk(dt))
                 {
                     atk = null; Pose = "idle"; lockFace = false;
-                    restT = Phase == 2 ? Random.Range(0.45f, 0.85f) : Random.Range(0.8f, 1.4f);
+                    restT = (Phase == 2 ? Random.Range(0.45f, 0.85f) : Random.Range(0.8f, 1.4f)) * Game.BossRestMul;
                 }
                 Animate(dt);
                 return;
@@ -388,6 +388,8 @@ namespace AndoBoss
             FreezeT = sec;
             if (sec > 0) { atk = null; lockFace = false; Y = 0; Pose = "idle"; }
             iceBlock.SetActive(sec > 0);
+            // 菅原先生は背が高いので、氷も縦に大きく
+            iceBlock.transform.localScale = IsSuga ? new Vector3(0.85f, 1.3f, 0.85f) : Vector3.one;
         }
         // セリフは自分の名前で言う（ダブルのときにどっちが話したか分かるように）
         void Speak(string text, float sec = 2.6f) => Game.I.Say(text, sec, Name);

@@ -3,10 +3,10 @@ using UnityEngine;
 namespace AndoBoss
 {
     // 属性（ゲーム内の呼び名は「属性」）
-    public enum Elem { None, Electro, Pyro, Wind }
-    public enum Weapon { Sword, Fist, Bow }
+    public enum Elem { None, Electro, Pyro, Wind, Ice }
+    public enum Weapon { Sword, Fist, Bow, Spear }
 
-    // 操作キャラ3人の設定（3人とも架空の人物）
+    // 操作キャラ4人の設定
     // E＝特技、Q＝奥義、ゲージ＝やる気
     public class CharDef
     {
@@ -52,7 +52,19 @@ namespace AndoBoss
                 Hair = new Color(0.25f, 0.35f, 0.3f), Jacket = new Color(0.3f, 0.5f, 0.42f), Pants = new Color(0.2f, 0.22f, 0.26f),
                 Accent = new Color(0.55f, 1f, 0.75f), Eye = new Color(0.3f, 0.75f, 0.55f), Skin = new Color(0.98f, 0.88f, 0.8f), Glasses = true, Sleepy = true,
             },
+            new CharDef
+            {
+                Id = 3, Name = "らいと", Title = "自称・数学の神", Elem = Elem.Ice, Weapon = Weapon.Spear, MaxHp = 1300f, AtkMul = 1.3f, Height = 1.02f,
+                SwingDmg = new[] { 34f, 38, 52, 60, 115 }, SwingDur = new[] { 0.27f, 0.27f, 0.33f, 0.33f, 0.6f },
+                SkillCd = 8f, SkillName = "証明終了（Q.E.D.）", BurstName = "数学の神・無限連突き", BurstShout = "ぼくは数学の神だよ！",
+                Passive = "天才：会心率がいつも15%アップ（ぼくてんさいだから！）",
+                Hair = new Color(0.16f, 0.16f, 0.2f), Jacket = new Color(0.2f, 0.3f, 0.45f), Pants = new Color(0.14f, 0.15f, 0.22f),
+                Accent = new Color(0.6f, 0.88f, 1f), Eye = new Color(0.35f, 0.65f, 0.95f), Skin = new Color(1f, 0.88f, 0.78f),
+            },
         };
+
+        // 武器の呼び名
+        public string WeaponName => Weapon == Weapon.Sword ? "片手剣" : Weapon == Weapon.Fist ? "拳" : Weapon == Weapon.Bow ? "弓" : "槍";
     }
 
     public static class Elements
@@ -64,10 +76,11 @@ namespace AndoBoss
                 case Elem.Electro: return new Color(0.71f, 0.49f, 1f);
                 case Elem.Pyro: return new Color(1f, 0.5f, 0.2f);
                 case Elem.Wind: return new Color(0.55f, 1f, 0.75f);
+                case Elem.Ice: return new Color(0.6f, 0.88f, 1f);
                 default: return UnityEngine.Color.white;
             }
         }
-        public static string Kanji(Elem e) => e == Elem.Electro ? "雷" : e == Elem.Pyro ? "炎" : e == Elem.Wind ? "風" : "";
+        public static string Kanji(Elem e) => e == Elem.Electro ? "雷" : e == Elem.Pyro ? "炎" : e == Elem.Wind ? "風" : e == Elem.Ice ? "氷" : "";
 
         // 属性コンボ（ちがう属性を続けて当てたとき）。name が null ならなし
         public static (string name, float mul, float extra, float tough, Color color) React(Elem aura, Elem hit)
@@ -76,7 +89,10 @@ namespace AndoBoss
             bool Has(Elem a, Elem b) => (aura == a && hit == b) || (aura == b && hit == a);
             if (Has(Elem.Electro, Elem.Pyro)) return ("過電流", 1f, 0.8f, 1.3f, new Color(1f, 0.45f, 0.6f));
             if (Has(Elem.Electro, Elem.Wind)) return ("放電嵐", 1f, 0.5f, 1.8f, new Color(0.7f, 0.8f, 1f));
-            return ("火炎旋風", 1.6f, 0, 1.2f, new Color(1f, 0.8f, 0.4f));
+            if (Has(Elem.Pyro, Elem.Wind)) return ("火炎旋風", 1.6f, 0, 1.2f, new Color(1f, 0.8f, 0.4f));
+            if (Has(Elem.Ice, Elem.Electro)) return ("超電導", 1f, 0.6f, 1.6f, new Color(0.75f, 0.7f, 1f));
+            if (Has(Elem.Ice, Elem.Pyro)) return ("融解", 1.8f, 0, 1.1f, new Color(1f, 0.75f, 0.6f));
+            return ("吹雪", 1f, 0.5f, 1.5f, new Color(0.8f, 0.95f, 1f));
         }
     }
 }

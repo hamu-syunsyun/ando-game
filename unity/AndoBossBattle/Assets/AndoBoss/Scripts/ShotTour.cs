@@ -9,7 +9,7 @@ namespace AndoBoss
     public class ShotTour : MonoBehaviour
     {
         string dir;
-        int boss;
+        int boss, chara;
 
         public static void StartIfRequested(Game g)
         {
@@ -25,6 +25,8 @@ namespace AndoBoss
                     t.dir = args[i + 1];
                     int bi = System.Array.IndexOf(args, "-andoBoss");
                     if (bi >= 0 && bi + 1 < args.Length) int.TryParse(args[bi + 1], out t.boss);
+                    int ci = System.Array.IndexOf(args, "-andoChar");
+                    if (ci >= 0 && ci + 1 < args.Length) int.TryParse(args[ci + 1], out t.chara);
                     Directory.CreateDirectory(t.dir);
                     return;
                 }
@@ -38,10 +40,16 @@ namespace AndoBoss
             Debug.Log("[ShotTour] start");
             yield return Wait(3f);
             yield return ShotCo("01_title");
+            G.GoSettings();
+            yield return Wait(0.8f);
+            yield return ShotCo("015_settings");
+            G.GoTitle();
+            yield return Wait(0.5f);
             G.GoSelect();
             if (boss != 0) G.SelectBoss(boss);
             yield return Wait(1.2f);
             yield return ShotCo("02_bossselect");
+            G.StartChar = chara;
             G.GoCharSelect();
             yield return Wait(1.2f);
             yield return ShotCo("02_select");
@@ -67,11 +75,27 @@ namespace AndoBoss
             G.PartyStam = 60;
             yield return Wait(0.3f);
             yield return ShotCo("05_hits");
+            // 構えの確認：横から見る
+            {
+                var P = G.Player;
+                var right = new Vector3(Mathf.Cos(P.Face), 0, -Mathf.Sin(P.Face));
+                G.Cam.Cinematic(P.Pos + right * 3.2f + Vector3.up * 1.4f + P.Forward * 0.8f, P.Pos + Vector3.up * 1.1f, 40, true);
+                if (P.Def.Weapon == Weapon.Bow) { P.ShootT = 1f; P.ShootUp = false; }
+                if (P.Def.Weapon == Weapon.Spear) P.ThrustT = 1f;
+                yield return Wait(0.25f);
+                yield return ShotCo("055_pose");
+                if (P.Def.Weapon == Weapon.Bow) P.ShootUp = true;
+                yield return Wait(0.2f);
+                yield return ShotCo("056_pose");
+                G.Cam.EndCinematic();
+            }
             G.Player.Energy = 100;
             G.StartBurst(G.Player);
             yield return Wait(0.5f);
             yield return ShotCo("06_cutin");
-            yield return Wait(3f);
+            yield return Wait(1.6f);
+            yield return ShotCo("065_burst");
+            yield return Wait(1.4f);
             G.PerfectDodge();
             yield return Wait(0.3f);
             yield return ShotCo("07_perfect");
@@ -109,7 +133,7 @@ namespace AndoBoss
 
         IEnumerator ShotCo(string name)
         {
-            var path = Path.Combine(dir, $"b{boss}_{name}_{Screen.width}x{Screen.height}.png");
+            var path = Path.Combine(dir, $"b{boss}c{chara}_{name}_{Screen.width}x{Screen.height}.png");
             ScreenCapture.CaptureScreenshot(path);
             Debug.Log("[ShotTour] " + path);
             // 撮影はフレームの最後に行われるので、次の操作は2フレーム待ってから

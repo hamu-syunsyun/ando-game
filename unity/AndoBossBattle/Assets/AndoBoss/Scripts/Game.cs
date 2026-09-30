@@ -3,10 +3,10 @@ using UnityEngine;
 namespace AndoBoss
 {
     // ゲーム全体の進行：タイトル → 登場演出 → 戦闘 → 決着 → 結果
-    public class Game : MonoBehaviour
+    public partial class Game : MonoBehaviour
     {
         public static Game I;
-        public enum Mode { Title, Select, Intro, Battle, Ending, Result }
+        public enum Mode { Title, Select, Intro, Battle, Ending, Result, Settings }
         public enum HitKind { Normal, Skill, Burst }
 
         public Mode State { get; private set; }
@@ -41,13 +41,14 @@ namespace AndoBoss
         public bool ReviveUsed;
         float drinkT;
         // 難しさの調整：ボスの攻撃の強さ・こちらの攻撃の強さ
-        public float EnemyDmgMul = 1.4f;
+        public float EnemyDmgMul = 1.4f; // 難易度で変わる（ResetRound で設定）
         public const float PlayerDmgMul = 0.85f;
         float comboT, stateT, titleOrbit, swapCd;
         bool paused;
         public bool Cinematic;
         bool win; string loseReason;
         bool energyAnnounced;
+        bool raitoLow; float raitoCd;
         string BestKey => BossKind == 2 ? "double_boss_best" : BossKind == 1 ? "suga_boss_best" : "ando_boss_best";
 
         // 画風：0 = アニメ調, 1 = リアル調（F3 で切り替え）
@@ -73,6 +74,8 @@ namespace AndoBoss
             foreach (var a in FindObjectsByType<AudioListener>(FindObjectsSortMode.None)) a.enabled = false;
 
             Style = PlayerPrefs.GetInt("ando_style2", 0);
+            Difficulty = Mathf.Clamp(PlayerPrefs.GetInt("ando_diff", 1), 0, DiffNames.Length - 1);
+            Binds.EnsureLoaded();
             PostFX.Level = PlayerPrefs.GetInt("ando_light", 1);
             realism = Style;
             Shader.SetGlobalFloat("_AndoRealism", realism);
@@ -119,6 +122,7 @@ namespace AndoBoss
         {
             Fx.ClearAll();
             foreach (var o in FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
+            EnemyDmgMul = DiffDmg[Difficulty];
             PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(15f, 22f);
             foreach (var d in FindObjectsByType<Drink>(FindObjectsSortMode.None)) Destroy(d.gameObject);
             foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
@@ -131,6 +135,7 @@ namespace AndoBoss
             Dealt = Combo = MaxCombo = Perfects = Reactions = 0;
             comboT = 0;
             energyAnnounced = false;
+            raitoLow = false; raitoCd = 0;
             Cinematic = false;
             Sky.SetStorm(StormFor(BossKind));
             Counts = 0;
@@ -226,7 +231,7 @@ namespace AndoBoss
                 var p = Party[i];
                 p.gameObject.SetActive(true);
                 p.ResetState();
-                p.Pos = new Vector3((i - 1) * 2.4f, 0, -9);
+                p.Pos = new Vector3((i - (Party.Length - 1) / 2f) * 2.2f, 0, -9);
                 p.Face = Mathf.PI;
             }
             Hud.ShowSelect(StartChar);
@@ -246,7 +251,7 @@ namespace AndoBoss
                 Hud.ShowSelect(StartChar);
             }
             var sel = Party[StartChar];
-            Cam.Cinematic(sel.Pos + new Vector3(0.6f, 1.2f, -5.2f), sel.Pos + Vector3.up * 0.35f, 40, stateT < 0.05f); // カードに隠れないよう、キャラを画面の上半分に
+            Cam.Cinematic(new Vector3(sel.Pos.x * 0.6f, 0, sel.Pos.z) + new Vector3(0.6f, 1.25f, -5.6f), new Vector3(sel.Pos.x * 0.6f, 0, sel.Pos.z) + Vector3.up * 0.35f, 42, stateT < 0.05f); // カードに隠れないよう、キャラを画面の上半分に
             for (int i = 0; i < Party.Length; i++)
             {
                 var p = Party[i];
@@ -276,6 +281,12 @@ namespace AndoBoss
             if (GameInput.Down(GameInput.K.Char1)) BossKind = 0;
             if (GameInput.Down(GameInput.K.Char2)) BossKind = 1;
             if (GameInput.Down(GameInput.K.Char3)) BossKind = 2;
+            // ↑↓ で難易度
+            if (GameInput.Down(GameInput.K.Up) || GameInput.Down(GameInput.K.Down))
+            {
+                SetDifficulty(Difficulty + (GameInput.Down(GameInput.K.Up) ? 1 : -1));
+                Sfx.Play("tick", 0.7f, 1f + Difficulty * 0.1f);
+            }
             if (before != BossKind)
             {
                 Sfx.Play("swap", 0.6f, 0.9f);
@@ -313,6 +324,7 @@ namespace AndoBoss
             State = Mode.Battle; stateT = 0;
             Cam.EndCinematic();
             Cam.SnapBehindPlayer();
+            if (Player.Def.Weapon == Weapon.Spear) Say("ぼくそんなんじゃないよ〜", 2f, Player.Def.Name);
             Hud.EndIntro();
             Hud.Banner("単位争奪戦", "START!", Color.white, 1.2f);
             Sfx.Play("burstHit", 0.6f);
@@ -334,6 +346,7 @@ namespace AndoBoss
         {
             float dt = Time.deltaTime;
             stateT += Time.unscaledDeltaTime;
+            GameInput.UpdateDevice();
             Sky.Update(Time.unscaledDeltaTime);
             World.Update(dt, Boss.Phase == 2 ? 1 : 0);
 
@@ -375,6 +388,7 @@ namespace AndoBoss
                 case Mode.Battle: UpdateBattle(dt); break;
                 case Mode.Ending: UpdateEnding(dt); break;
                 case Mode.Result: UpdateResult(); break;
+                case Mode.Settings: UpdateSettings(); break;
             }
         }
 
@@ -407,6 +421,7 @@ namespace AndoBoss
             Cam.Cinematic(c, BossFocus + Vector3.up * 3.2f + new Vector3(Mathf.Cos(titleOrbit), 0, -Mathf.Sin(titleOrbit)) * 4, 50, stateT < 0.1f);
             TickParty(Time.deltaTime);
             TickBosses(Time.deltaTime);
+            if (stateT > 0.5f && GameInput.Down(GameInput.K.Settings)) { GoSettings(); return; }
             if (stateT > 0.5f && GameInput.Down(GameInput.K.Confirm)) GoSelect();
         }
 
@@ -450,7 +465,7 @@ namespace AndoBoss
             {
                 energyAnnounced = true;
                 Sfx.Play("ready", 0.7f);
-                Hud.Toast($"{Player.Def.Name}の奥義 準備完了！　Q で発動");
+                Hud.Toast($"{Player.Def.Name}の奥義 準備完了！　{GameInput.ShortLabel(GameInput.K.Burst)} で発動");
             }
             if (Player.Energy < 100) energyAnnounced = false;
 
@@ -565,7 +580,7 @@ namespace AndoBoss
         {
             var B = Boss; var P = Player;
             if (State != Mode.Battle || !B.Alive) return;
-            float critRate = P.BuffT > 0 ? 0.6f : 0.18f;
+            float critRate = (P.BuffT > 0 ? 0.6f : 0.18f) + (P.Def.Weapon == Weapon.Spear ? 0.15f : 0f); // らいとの能力「天才」
             bool crit = Random.value < critRate;
             float mul = PlayerDmgMul * (crit ? 1.7f : 1f) * (B.Broken ? 1.3f : 1f) * (B.DefDownT > 0 ? 1.3f : 1f) * Random.Range(0.9f, 1.1f);
 
@@ -577,9 +592,12 @@ namespace AndoBoss
                 B.Aura = Elem.None; B.AuraT = 0;
                 Reactions++;
                 Hud.WorldText(hitPos + Vector3.up * 1.2f, react.name, react.color, 1.1f);
-                Sfx.Play(react.name == "過電流" ? "explode" : react.name == "放電嵐" ? "thunder" : "fire", 0.9f);
+                Sfx.Play(react.name == "過電流" ? "explode" : react.name == "放電嵐" || react.name == "超電導" ? "thunder" : react.name == "吹雪" || react.name == "融解" ? "ice" : "fire", 0.9f);
                 if (react.name == "過電流") { Fx.Explosion(hitPos, react.color, 1.5f); Cam.Shake(0.4f); }
                 else if (react.name == "放電嵐") { Fx.Ring(B.Pos, 6, react.color, 0.4f, 3f); Fx.Sparks(hitPos, react.color, 30, 1.4f); Fx.Bolt(B.Pos, react.color, 0.3f, 10f); }
+                else if (react.name == "超電導") { Fx.Ring(B.Pos, 7, react.color, 0.45f, 3f); Fx.Bolt(B.Pos, react.color, 0.3f, 12f); Fx.Stars(hitPos, react.color, 10); }
+                else if (react.name == "吹雪") { Fx.Ring(B.Pos, 6, Color.white, 0.4f, 3f); Fx.Sparks(hitPos, react.color, 40, 1.6f); Fx.Stars(hitPos, Color.white, 8); }
+                else if (react.name == "融解") { Fx.Glow(hitPos, react.color, 2.4f); Fx.Sparks(hitPos, Color.white, 24, 1.2f); Cam.Shake(0.3f); }
                 else { Fx.Glow(hitPos, react.color, 2f); Fx.Embers(hitPos, react.color, 20); }
                 PostFX.I?.Chroma(0.15f);
             }
@@ -660,6 +678,12 @@ namespace AndoBoss
             Fx.Sparks(Player.Pos + Vector3.up, new Color(1, 0.4f, 0.4f), 12);
             if (Combo >= 5) Hud.Toast($"{Combo} コンボ終了");
             Combo = 0;
+            // らいとは、やられるとキレる。HPが減ると友だちを呼ぶ
+            if (Player.Def.Weapon == Weapon.Spear && State == Mode.Battle)
+            {
+                if (!raitoLow && PartyHp < Player.MaxHp * 0.3f && PartyHp > 0) { raitoLow = true; Say("えいじぃ〜", 2.2f, Player.Def.Name); return; }
+                if (Time.time > raitoCd && Random.value < 0.5f) { raitoCd = Time.time + 9f; Say("おまえふざけんなよぉぉぉ", 2f, Player.Def.Name); return; }
+            }
             Boss.OnHitPlayer();
         }
 
@@ -678,7 +702,8 @@ namespace AndoBoss
         public void PerfectDodge()
         {
             Perfects++;
-            if (BossKind != 0 && Counts > 0)
+            bool canceled = BossKind != 0 && Counts > 0;
+            if (canceled)
             {
                 // ジャスト回避でカウントを1つ取り消せる
                 Counts--;
@@ -686,6 +711,7 @@ namespace AndoBoss
                 Fx.Later(0.6f, () => Hud.Banner("カウント取り消し！", $"残りカウント {Counts}", new Color(0.6f, 0.95f, 1f), 1.0f));
                 Say("……今のは、ノーカウント。", 1.8f, "菅原先生");
             }
+            if (Player.Def.Weapon == Weapon.Spear && !canceled) Fx.Later(0.5f, () => Say("ぼくてんさいだから！", 1.6f, Player.Def.Name));
             Player.BuffT = 5f;
             Player.Energy = Mathf.Min(100, Player.Energy + 15);
             Fx.Slow(0.22f, 0.9f);
@@ -772,6 +798,7 @@ namespace AndoBoss
             {
                 case 0: Skills.TomokiBurst(p); break;
                 case 1: Skills.SugiyamaBurst(p); break;
+                case 3: Skills.RaitoBurst(p); break;
                 default: Skills.YamashouBurst(p); break;
             }
         }
@@ -907,6 +934,9 @@ namespace AndoBoss
                 charName = Player.Def.Name,
             };
             d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus + d.reactions * 20;
+            // 難易度で点数に倍率がかかる（やさしい ×0.7 〜 鬼 ×1.5）
+            d.total = Mathf.RoundToInt(d.total * DiffScore[Difficulty]);
+            d.charName = $"{Player.Def.Name}（{DiffNames[Difficulty]}）";
             // ダブルは与ダメージの上限が 22000（+6000）、撃破ボーナスが +2000 なので基準も上げる
             int off = IsDouble ? 8000 : 0;
             d.grade = !win ? "不可" : d.total >= 19500 + off ? "秀" : d.total >= 18700 + off ? "優" : d.total >= 18000 + off ? "良" : "可";

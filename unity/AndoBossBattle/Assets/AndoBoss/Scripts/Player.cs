@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace AndoBoss
 {
-    // 操作キャラ（ともき・杉山くん・やましょう の3人で共通のしくみ）。
+    // 操作キャラ（ともき・杉山くん・やましょう・らいと の4人で共通のしくみ）。
     // 見た目・攻撃力・スキル・奥義は CharDef で切り替える
     public class Player : MonoBehaviour
     {
@@ -13,6 +13,10 @@ namespace AndoBoss
         // 状態（HPとスタミナはパーティ共通なので Game が持つ）
         public Vector3 Pos;
         public float Vy, Face, Inv, Dodge, DodgeAge, SkillCd, Energy, HurtT, BuffT, BurstT, DeadT, SwapInT, LockT;
+        // 弓を構えて撃っている間（特技・奥義など、通常攻撃以外で矢を撃つとき）。ShootUp なら空に向ける
+        public float ShootT; public bool ShootUp;
+        // 槍の突き出し（特技などで外から動かすとき）
+        public float ThrustT;
         Vector3 knock;
         public float Hp { get => Game.I.PartyHp; set => Game.I.PartyHp = value; }
         public float Stam { get => Game.I.PartyStam; set => Game.I.PartyStam = value; }
@@ -143,6 +147,18 @@ namespace AndoBoss
                     Mat.Part(grip, Mat.Sphere, bladeMat, Vector3.zero, Vector3.one * 0.2f);
                     tipLocal = new Vector3(0, 0, 0.05f);
                     break;
+                case Weapon.Spear:
+                    // 槍：長い柄＋氷の穂先（数式の飾りつき）
+                    bladeMat = Mat.Toon(new Color(0.8f, 0.95f, 1f), 0.01f, new Color(0.55f, 0.85f, 1f, 0.35f));
+                    mats.Add(bladeMat);
+                    var shaft = M(new Color(0.2f, 0.22f, 0.3f), 0.01f);
+                    Mat.Part(grip, Mat.Frustum(0.03f, 0.03f, 2.3f, 8), shaft, new Vector3(0, 0, 0.45f), Vector3.one, new Vector3(90, 0, 0));
+                    Mat.Part(grip, Mat.Cube, gold, new Vector3(0, 0, 1.6f), new Vector3(0.3f, 0.045f, 0.05f));
+                    Mat.Part(grip, Mat.Sphere, M(ec, 0), new Vector3(0, 0, 1.6f), Vector3.one * 0.08f);
+                    Mat.Part(grip, Mat.Frustum(0.1f, 0.0f, 0.5f, 4), bladeMat, new Vector3(0, 0, 1.87f), new Vector3(1, 1, 0.3f), new Vector3(90, 0, 0));
+                    Mat.Part(grip, Mat.Frustum(0.035f, 0.035f, 0.12f, 8), gold, new Vector3(0, 0, -0.72f), Vector3.one, new Vector3(90, 0, 0));
+                    tipLocal = new Vector3(0, 0, 2.05f);
+                    break;
                 case Weapon.Bow:
                     // 弓：持ち手・上下の弓幹・弦（縦向き）
                     bladeMat = Mat.Toon(new Color(0.85f, 1f, 0.9f), 0.01f, new Color(0.5f, 1f, 0.7f, 0.3f));
@@ -169,7 +185,7 @@ namespace AndoBoss
             trail = tip.gameObject.AddComponent<TrailRenderer>();
             trail.time = 0.14f;
             trail.minVertexDistance = 0.05f;
-            trail.widthMultiplier = def.Weapon == Weapon.Fist ? 0.5f : def.Weapon == Weapon.Bow ? 0f : 0.9f;
+            trail.widthMultiplier = def.Weapon == Weapon.Fist ? 0.5f : def.Weapon == Weapon.Bow ? 0f : def.Weapon == Weapon.Spear ? 0.45f : 0.9f;
             trail.widthCurve = new AnimationCurve(new Keyframe(0, 1), new Keyframe(1, 0));
             var g = new Gradient();
             g.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(ec, 0.3f), new GradientColorKey(ec * 0.6f, 1) },
@@ -188,7 +204,7 @@ namespace AndoBoss
             Pos = new Vector3(0, 0, -9);
             Vy = 0; Face = 0; Inv = 0; Dodge = 0; SkillCd = 0; Energy = 40;
             HurtT = 0; BuffT = 0; BurstT = 0; DeadT = 0; OnGround = true; Dead = false; Victory = false; SwapInT = 0; LockT = 0; knock = Vector3.zero;
-            swing = null; comboIdx = 0; comboTimer = 0; queued = false; elemIcd = 0;
+            swing = null; comboIdx = 0; comboTimer = 0; queued = false; elemIcd = 0; ShootT = 0; ShootUp = false; ThrustT = 0;
             transform.position = Pos;
             body.localRotation = Quaternion.identity;
             body.localPosition = Vector3.zero;
@@ -229,7 +245,7 @@ namespace AndoBoss
             swing = new Swing { t = 0, dur = Def.SwingDur[comboIdx], idx = comboIdx, face = FaceForAttack() };
             bool fin = comboIdx == LastIdx;
             if (Def.Weapon == Weapon.Bow) Sfx.Play("arrow", 0.7f, fin ? 0.85f : 1f, 0.08f);
-            else Sfx.Play(fin ? "slash3" : "slash" + (comboIdx % 3), 0.8f, (Def.Weapon == Weapon.Fist ? 0.75f : 1f) * (fin ? 0.9f : 1f), 0.08f);
+            else Sfx.Play(fin ? "slash3" : "slash" + (comboIdx % 3), 0.8f, (Def.Weapon == Weapon.Fist ? 0.75f : Def.Weapon == Weapon.Spear ? 1.15f : 1f) * (fin ? 0.9f : 1f), 0.08f);
             trail.Clear();
             trail.emitting = true;
             queued = false;
@@ -261,7 +277,7 @@ namespace AndoBoss
             float d = Flat(B.Pos - Pos).magnitude;
             float dir = Mathf.Atan2(B.Pos.x - Pos.x, B.Pos.z - Pos.z);
             bool inArc = AngDiff(Face, dir) < (fin && Def.Weapon != Weapon.Fist ? Mathf.PI : 1.5f);
-            float reach = Boss.Radius + (fin ? 3.2f : 2.5f) - (Def.Weapon == Weapon.Fist ? 0.4f : 0);
+            float reach = Boss.Radius + (fin ? 3.2f : 2.5f) - (Def.Weapon == Weapon.Fist ? 0.4f : 0) + (Def.Weapon == Weapon.Spear ? 1.1f : 0);
             if (B.Alive && d < reach && inArc && B.Y < 2.5f)
             {
                 var hitPos = B.Pos + Vector3.up * 2.2f - Flat(B.Pos - Pos).normalized * Boss.Radius;
@@ -269,6 +285,12 @@ namespace AndoBoss
                 if (fin) { G.Cam.Shake(0.25f); Fx.Ring(Pos + fwd * 1.5f, 3.5f, Def.ElemColor, 0.3f); }
             }
             else if (fin) Fx.Ring(Pos + fwd * 1.2f, 3.2f, Def.ElemColor, 0.3f);
+            if (Def.Weapon == Weapon.Spear)
+            {
+                Fx.Sparks(Pos + fwd * 2.6f + Vector3.up * 1.2f, Color.Lerp(Def.ElemColor, Color.white, 0.5f), fin ? 14 : 5, 0.7f);
+                // らいとは、ときどき自慢する
+                if (fin && Random.value < 0.35f) G.Hud.WorldText(Pos + Vector3.up * 2.4f, Random.value < 0.5f ? "ぼくてんさいだから！" : "ぼくは数学の神だよ！", Def.ElemColor, 0.8f);
+            }
             if (Def.Weapon == Weapon.Fist) { Fx.Explosion(Pos + fwd * 1.3f + Vector3.up * 1.1f, Def.ElemColor, fin ? 0.9f : 0.35f); Sfx.Play("fire", fin ? 0.6f : 0.3f, 1.3f); }
         }
 
@@ -304,6 +326,7 @@ namespace AndoBoss
             {
                 case 0: Skills.Report(this); break;
                 case 1: Skills.RugbyPass(this); break;
+                case 3: Skills.QED(this); break;
                 default: Skills.NidoneArrow(this); break;
             }
         }
@@ -326,6 +349,8 @@ namespace AndoBoss
             HurtT = Mathf.Max(0, HurtT - dt);
             SkillCd = Mathf.Max(0, SkillCd - dt);
             BuffT = Mathf.Max(0, BuffT - dt);
+            ShootT = Mathf.Max(0, ShootT - dt);
+            ThrustT = Mathf.Max(0, ThrustT - dt);
             SwapInT = Mathf.Max(0, SwapInT - dt);
             LockT = Mathf.Max(0, LockT - dt);
             elemIcd = Mathf.Max(0, elemIcd - dt);
@@ -472,7 +497,18 @@ namespace AndoBoss
             float lean = 0, bob = 0, legSwing = 0, armSwing = 0;
             Quaternion armLRot = Quaternion.Euler(0, 0, -8), armRRot = Quaternion.Euler(0, 0, 8);
             Quaternion swordRot = Quaternion.Euler(125, 0, -20);
-            float spin = 0;
+            float spin = 0, ext = 0;
+            bool bowHeld = false;
+            // 弓を構える：左手で弓を前に出し、右手で弦を引く（pull 0〜1）
+            void BowPose(float pull, bool up)
+            {
+                float lift = up ? -45 : 0;
+                armLRot = Quaternion.Euler(-90 + lift, 0, 0);
+                armRRot = Quaternion.Euler(-90 + lift, Mathf.Lerp(-20, 75, pull), 0);
+                swordRot = Quaternion.Euler(lift, 0, 0);
+                lean = up ? -12 : -4;
+                bowHeld = true;
+            }
 
             if (Dead)
             {
@@ -495,6 +531,18 @@ namespace AndoBoss
                 bob = Mathf.Sin(u * Mathf.PI) * 0.6f;
                 if (Random.value < 0.8f) Fx.Sparks(transform.position + Vector3.up * 3.2f, Color.Lerp(Def.ElemColor, Color.white, 0.4f), 2, 0.6f);
             }
+            else if (Def.Weapon == Weapon.Bow && ShootT > 0 && swing == null)
+            {
+                // 連射：弦を引いて放すのをくり返す
+                BowPose(Mathf.Repeat(idleT * 7f, 1f), ShootUp);
+            }
+            else if (Def.Weapon == Weapon.Spear && ThrustT > 0 && swing == null)
+            {
+                // 特技の突進：槍をまっすぐ前へ
+                swordRot = Quaternion.Euler(6, 0, 0);
+                ext = 0.6f; lean = 25; legSwing = 30;
+                armRRot = Quaternion.FromToRotation(Vector3.down, (Vector3.forward + Vector3.down * 0.3f).normalized);
+            }
             else if (Dodge > 0)
             {
                 lean = 35; legSwing = 40;
@@ -507,6 +555,7 @@ namespace AndoBoss
                 int pattern;
                 bool fin = swing.idx == LastIdx;
                 if (Def.Weapon == Weapon.Bow) pattern = 5;
+                else if (Def.Weapon == Weapon.Spear) pattern = fin ? 3 : swing.idx == 2 ? 0 : 6;
                 else if (fin) pattern = Def.Weapon == Weapon.Fist ? 2 : 3;
                 else pattern = swing.idx % 2;
                 switch (pattern)
@@ -514,7 +563,13 @@ namespace AndoBoss
                     case 0: swordRot = Quaternion.Euler(0, Mathf.Lerp(110, -80, e), -30); lean = 10; break;
                     case 1: swordRot = Quaternion.Euler(0, Mathf.Lerp(-100, 90, e), 25); lean = 10; break;
                     case 2: swordRot = Quaternion.Euler(Mathf.Lerp(-120, 50, e), -5, 0); lean = Mathf.Lerp(-10, 25, e); break;
-                    case 5: swordRot = Quaternion.Euler(0, 0, 0); armLRot = Quaternion.Euler(-80, 0, 20); lean = -4; break; // 弓を構えて引く
+                    case 5: BowPose(u < 0.45f ? u / 0.45f : Mathf.Max(0, 1 - (u - 0.45f) * 6), false); break; // 弓を引いて放す
+                    case 6:
+                        // 槍の突き：引いてから前へ突き出す
+                        float th = u < 0.3f ? -0.3f * (u / 0.3f) : Mathf.Sin(Mathf.Clamp01((u - 0.3f) / 0.5f) * Mathf.PI) * 0.8f;
+                        swordRot = Quaternion.Euler(6, swing.idx % 2 == 0 ? -4 : 4, 0);
+                        ext = th; lean = 8 + th * 18;
+                        break;
                     default:
                         spin = Mathf.Lerp(0, 360, Mathf.SmoothStep(0, 1, Mathf.Clamp01(u / 0.55f)));
                         swordRot = Quaternion.Euler(10, 70, 0);
@@ -522,8 +577,11 @@ namespace AndoBoss
                         bob = Mathf.Sin(Mathf.Clamp01(u / 0.55f) * Mathf.PI) * 0.35f;
                         break;
                 }
-                var dir = swordRot * Vector3.forward;
-                armRRot = Quaternion.FromToRotation(Vector3.down, (dir + Vector3.down * 0.3f).normalized);
+                if (!bowHeld)
+                {
+                    var dir = swordRot * Vector3.forward;
+                    armRRot = Quaternion.FromToRotation(Vector3.down, (dir + Vector3.down * 0.3f).normalized);
+                }
             }
             else if (!OnGround)
             {
@@ -558,15 +616,18 @@ namespace AndoBoss
                     hipR.localRotation = Quaternion.Euler(-legSwing, 0, 0);
                 }
             }
-            if (swing == null && BurstT <= 0 && !Victory && !Dead && moveSpeed > 1f && OnGround)
+            if (swing == null && BurstT <= 0 && !bowHeld && ThrustT <= 0 && !Victory && !Dead && moveSpeed > 1f && OnGround)
             {
                 armLRot = Quaternion.Euler(-armSwing, 0, -8);
                 armRRot = Quaternion.Euler(armSwing * 0.5f, 0, 10);
             }
-            armL.localRotation = Quaternion.Slerp(armL.localRotation, armLRot, dt * 18);
-            armR.localRotation = swing != null ? armRRot : Quaternion.Slerp(armR.localRotation, armRRot, dt * 18);
-            swordPivot.localRotation = swing != null ? swordRot : Quaternion.Slerp(swordPivot.localRotation, swordRot, dt * 14);
-            swordPivot.localPosition = armR.localPosition + armR.localRotation * new Vector3(0, -0.57f, 0) - swordPivot.localRotation * new Vector3(0, 0, 0.45f);
+            bool snap = swing != null || bowHeld || ThrustT > 0;
+            armL.localRotation = bowHeld ? Quaternion.Slerp(armL.localRotation, armLRot, dt * 30) : Quaternion.Slerp(armL.localRotation, armLRot, dt * 18);
+            armR.localRotation = snap ? armRRot : Quaternion.Slerp(armR.localRotation, armRRot, dt * 18);
+            swordPivot.localRotation = snap ? swordRot : Quaternion.Slerp(swordPivot.localRotation, swordRot, dt * 14);
+            // 弓を構えている間は左手で持つ。それ以外は右手
+            var holdArm = bowHeld ? armL : armR;
+            swordPivot.localPosition = holdArm.localPosition + holdArm.localRotation * new Vector3(0, -0.57f, 0) - swordPivot.localRotation * new Vector3(0, 0, 0.45f - ext);
 
             float target = Mathf.Clamp(moveSpeed * 5, 0, 70) + Mathf.Sin(idleT * 5) * 6;
             scarfSwing = Mathf.Lerp(scarfSwing, target, dt * 6);
