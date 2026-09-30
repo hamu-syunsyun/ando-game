@@ -38,13 +38,15 @@ namespace AndoBoss.EditorTools
         {
             // ウィンドウの題名からも名前を消す（ビルドが終わったら元に戻す）
             var oldName = PlayerSettings.productName;
+            var oldCompany = PlayerSettings.companyName;
             try
             {
                 AndoBossSetup.EnsureScene();
                 PlayerSettings.productName = "単位をもぎとれ ボス戦";
+                PlayerSettings.companyName = "TaniGame";
                 return Build(BuildTarget.StandaloneWindows64, Path.Combine(AnonOutDir, AnonExeName), new[] { "ANDO_ANON" }, false);
             }
-            finally { PlayerSettings.productName = oldName; }
+            finally { PlayerSettings.productName = oldName; PlayerSettings.companyName = oldCompany; }
         }
 
         [MenuItem("安東ボス戦/Windows用のexeを作る")]
