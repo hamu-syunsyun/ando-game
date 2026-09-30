@@ -411,13 +411,17 @@ namespace AndoBoss
                 var c = flat.normalized * (World.ArenaR - 0.6f);
                 Pos.x = c.x; Pos.z = c.z;
             }
-            var B = G.Boss;
-            var dv = Flat(Pos - B.Pos);
-            float min = Boss.Radius + 0.45f;
-            if (B.Alive && dv.magnitude < min && B.Y < 1.5f)
+            // ボスの体にめりこまない（ダブルのときは2人とも）
+            foreach (var B in G.Bosses)
             {
-                var c = B.Pos + (dv.sqrMagnitude > 1e-4f ? dv.normalized : Vector3.back) * min;
-                Pos.x = c.x; Pos.z = c.z;
+                if (!B.gameObject.activeSelf) continue;
+                var dv = Flat(Pos - B.Pos);
+                float min = Boss.Radius + 0.45f;
+                if (B.Alive && dv.magnitude < min && B.Y < 1.5f)
+                {
+                    var c = B.Pos + (dv.sqrMagnitude > 1e-4f ? dv.normalized : Vector3.back) * min;
+                    Pos.x = c.x; Pos.z = c.z;
+                }
             }
 
             if (Dead) DeadT += dt;

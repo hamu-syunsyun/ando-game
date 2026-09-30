@@ -34,7 +34,7 @@ namespace AndoBoss
             { "scythe", new[] { "単位、刈り取っちゃおうか。", "死神って呼ばれてるの、知ってる？" } },
             { "words", new[] { "抜き打ち英単語テスト、始めます。", "スペル、ちゃんと書ける？" } },
             { "morau", new[] { "（カウントを）もらってみる？？", "カウント、もらってみる？？" } },
-            { "wall", new[] { "英検準2級も取れないの？論外。", "英検の壁、越えられる？" } },
+            { "wall", new[] { "英検準2級も取れない人は……ピーーーーッ（自主規制）", "英検準2級も取れないの？論外。", "英検の壁、越えられる？" } },
             { "hakai", new[] { "北の破壊神、と呼ばれています。", "ここから先は、破壊の時間。" } },
         };
         static string SPick(string k) { var a = SugaLines[k]; return a[Random.Range(0, a.Length)]; }
@@ -51,69 +51,77 @@ namespace AndoBoss
             var coat = M(new Color(0.09f, 0.08f, 0.12f));     // 黒いロングコート
             var shirt = M(new Color(0.85f, 0.85f, 0.88f));
             var tie = M(new Color(0.55f, 0.08f, 0.12f));
-            var hairM = M(new Color(0.22f, 0.22f, 0.26f));
+            var hairM = M(new Color(0.94f, 0.94f, 0.96f));   // 白髪
             var dark = M(new Color(0.05f, 0.04f, 0.07f), 0);
 
+            // 背が高くて横は細い、ひょろっと細長い体形
             // 長い脚
-            legL = Mat.Pivot(inner, "legL", new Vector3(-0.32f, 1.8f, 0));
-            legR = Mat.Pivot(inner, "legR", new Vector3(0.32f, 1.8f, 0));
+            legL = Mat.Pivot(inner, "legL", new Vector3(-0.22f, 2.0f, 0));
+            legR = Mat.Pivot(inner, "legR", new Vector3(0.22f, 2.0f, 0));
             foreach (var l in new[] { legL, legR })
             {
-                Mat.Part(l, Mat.Frustum(0.17f, 0.22f, 1.8f, 12), coat, new Vector3(0, -0.9f, 0), Vector3.one);
-                Mat.Part(l, Mat.Sphere, dark, new Vector3(0, -1.78f, 0.14f), new Vector3(0.38f, 0.2f, 0.7f));
+                Mat.Part(l, Mat.Frustum(0.12f, 0.16f, 2.0f, 12), coat, new Vector3(0, -1.0f, 0), Vector3.one);
+                Mat.Part(l, Mat.Sphere, dark, new Vector3(0, -1.98f, 0.12f), new Vector3(0.3f, 0.18f, 0.62f));
             }
-            // すそが広がったロングコート
-            Mat.Part(inner, Mat.Frustum(1.15f, 0.75f, 2.8f, 20), coat, new Vector3(0, 2.8f, 0), Vector3.one);
-            Mat.Part(inner, Mat.Cube, shirt, new Vector3(0, 3.7f, 0.72f), new Vector3(0.42f, 1.0f, 0.1f), new Vector3(-8, 0, 0));
-            Mat.Part(inner, Mat.Cube, tie, new Vector3(0, 3.6f, 0.78f), new Vector3(0.16f, 0.85f, 0.08f), new Vector3(-8, 0, 0));
-            // 高い襟
-            Mat.Part(inner, Mat.Frustum(0.62f, 0.72f, 0.7f, 16, true), coat, new Vector3(0, 4.35f, -0.05f), Vector3.one);
+            // 細身のロングコート
+            Mat.Part(inner, Mat.Frustum(0.72f, 0.5f, 3.0f, 20), coat, new Vector3(0, 3.2f, 0), Vector3.one);
+            Mat.Part(inner, Mat.Cube, shirt, new Vector3(0, 4.15f, 0.5f), new Vector3(0.3f, 1.0f, 0.1f), new Vector3(-5, 0, 0));
+            Mat.Part(inner, Mat.Cube, tie, new Vector3(0, 4.05f, 0.55f), new Vector3(0.12f, 0.85f, 0.08f), new Vector3(-5, 0, 0));
+            // 襟
+            Mat.Part(inner, Mat.Frustum(0.44f, 0.5f, 0.55f, 16, true), coat, new Vector3(0, 4.72f, -0.03f), Vector3.one);
 
-            headT = Mat.Pivot(inner, "head", new Vector3(0, 4.45f, 0));
-            Mat.Part(headT, Mat.Sphere, skin, new Vector3(0, 0.72f, 0), new Vector3(1.45f, 1.65f, 1.45f));
-            // オールバックの髪
-            Mat.Part(headT, Mat.Sphere, hairM, new Vector3(0, 0.95f, -0.18f), new Vector3(1.5f, 1.45f, 1.45f));
-            Mat.Part(headT, Mat.Sphere, hairM, new Vector3(0, 1.25f, 0.2f), new Vector3(1.2f, 0.55f, 1.0f), new Vector3(-15, 0, 0));
-            // くぼんだ目のまわり（影）と、赤く光る目
-            foreach (float x in new[] { -0.27f, 0.27f })
+            // 細長い顔（メガネはなし）
+            headT = Mat.Pivot(inner, "head", new Vector3(0, 4.85f, 0));
+            Mat.Part(headT, Mat.Sphere, skin, new Vector3(0, 0.85f, 0), new Vector3(1.05f, 1.8f, 1.15f));
+            // あご
+            Mat.Part(headT, Mat.Sphere, skin, new Vector3(0, 0.2f, 0.12f), new Vector3(0.62f, 0.55f, 0.72f));
+            // 白髪（後ろになでつけた髪）
+            Mat.Part(headT, Mat.Sphere, hairM, new Vector3(0, 1.2f, -0.14f), new Vector3(1.13f, 1.35f, 1.18f));
+            Mat.Part(headT, Mat.Sphere, hairM, new Vector3(0, 1.66f, 0.08f), new Vector3(0.98f, 0.42f, 0.95f), new Vector3(-14, 0, 0));
+            foreach (float x in new[] { -0.5f, 0.5f })
+                Mat.Part(headT, Mat.Sphere, hairM, new Vector3(x, 1.05f, -0.12f), new Vector3(0.24f, 0.6f, 0.7f));
+            // 目のまわりの影・細い眉・赤く光る目
+            foreach (float x in new[] { -0.2f, 0.2f })
             {
-                Mat.Part(headT, Mat.Sphere, M(new Color(0.35f, 0.3f, 0.38f), 0), new Vector3(x, 0.78f, 0.6f), new Vector3(0.36f, 0.22f, 0.12f), default, false);
-                Mat.Part(headT, Mat.Cube, dark, new Vector3(x, 0.98f, 0.64f), new Vector3(0.36f, 0.05f, 0.05f), new Vector3(0, 0, x < 0 ? -25 : 25), false);
+                Mat.Part(headT, Mat.Sphere, M(new Color(0.55f, 0.48f, 0.52f), 0), new Vector3(x, 0.98f, 0.5f), new Vector3(0.26f, 0.14f, 0.1f), default, false);
+                Mat.Part(headT, Mat.Cube, hairM, new Vector3(x, 1.14f, 0.52f), new Vector3(0.26f, 0.045f, 0.05f), new Vector3(0, 0, x < 0 ? -18 : 18), false);
             }
-            eyeGlow = Mat.Fx(new Color(1, 0.15f, 0.2f, 0.9f), Mat.Glow, true, 3f);
-            foreach (float x in new[] { -0.27f, 0.27f })
+            eyeGlow = Mat.Fx(new Color(1, 0.15f, 0.2f, 0.8f), Mat.Glow, true, 3f);
+            foreach (float x in new[] { -0.2f, 0.2f })
             {
-                var e = Mat.Part(headT, Mat.Quad, eyeGlow, new Vector3(x, 0.78f, 0.7f), Vector3.one * 0.45f, default, false);
+                var e = Mat.Part(headT, Mat.Quad, eyeGlow, new Vector3(x, 0.98f, 0.58f), Vector3.one * 0.32f, default, false);
                 e.AddComponent<Billboard>();
             }
-            Mat.Part(headT, Mat.Sphere, skin, new Vector3(0, 0.6f, 0.72f), new Vector3(0.14f, 0.26f, 0.14f));
+            // 高い鼻
+            Mat.Part(headT, Mat.Sphere, skin, new Vector3(0, 0.74f, 0.57f), new Vector3(0.11f, 0.32f, 0.14f));
             // 薄い笑みの口
-            Mat.Part(headT, Mat.Cube, M(new Color(0.35f, 0.1f, 0.12f), 0), new Vector3(0, 0.3f, 0.66f), new Vector3(0.4f, 0.04f, 0.04f), new Vector3(0, 0, -6), false);
+            Mat.Part(headT, Mat.Cube, M(new Color(0.4f, 0.15f, 0.16f), 0), new Vector3(0, 0.38f, 0.5f), new Vector3(0.3f, 0.035f, 0.04f), new Vector3(0, 0, -6), false);
 
-            // 長い腕
+            // 長くて細い腕
+            const float hand = -2.05f;
             Transform MkArm(float x)
             {
-                var p = Mat.Pivot(inner, "arm", new Vector3(x, 4.0f, 0));
-                Mat.Part(p, Mat.Frustum(0.15f, 0.2f, 1.9f, 12), coat, new Vector3(0, -0.92f, 0), Vector3.one);
-                Mat.Part(p, Mat.Sphere, skin, new Vector3(0, -1.95f, 0), Vector3.one * 0.36f);
+                var p = Mat.Pivot(inner, "arm", new Vector3(x, 4.5f, 0));
+                Mat.Part(p, Mat.Frustum(0.11f, 0.15f, 2.0f, 12), coat, new Vector3(0, -0.98f, 0), Vector3.one);
+                Mat.Part(p, Mat.Sphere, skin, new Vector3(0, hand, 0), Vector3.one * 0.3f);
                 return p;
             }
-            armL = MkArm(-0.95f); armR = MkArm(0.95f);
+            armL = MkArm(-0.66f); armR = MkArm(0.66f);
 
             // 死神の鎌（赤ペン）：長い柄と、赤く光る曲がった刃
             var pole = M(new Color(0.15f, 0.12f, 0.14f), 0.02f);
-            Mat.Part(armR, Mat.Frustum(0.07f, 0.07f, 4.4f, 8), pole, new Vector3(0, -1.95f, 1.0f), Vector3.one, new Vector3(90, 0, 0));
+            Mat.Part(armR, Mat.Frustum(0.07f, 0.07f, 4.4f, 8), pole, new Vector3(0, hand, 1.0f), Vector3.one, new Vector3(90, 0, 0));
             var blade = Mat.Toon(SugaRed, 0.03f, new Color(1f, 0.1f, 0.15f, 0.5f)); mats.Add(blade);
             for (int i = 0; i < 7; i++)
             {
                 float a = i / 6f;
-                var pos = new Vector3(0, -1.95f + a * 1.4f * 0.2f + Mathf.Sin(a * Mathf.PI * 0.8f) * 1.3f, 3.2f - a * 1.7f + Mathf.Sin(a * 2.2f) * 0.2f);
+                var pos = new Vector3(0, hand + a * 1.4f * 0.2f + Mathf.Sin(a * Mathf.PI * 0.8f) * 1.3f, 3.2f - a * 1.7f + Mathf.Sin(a * 2.2f) * 0.2f);
                 Mat.Part(armR, Mat.Cube, blade, pos, new Vector3(0.06f, 0.35f - a * 0.2f, 0.55f), new Vector3(-a * 70 + 20, 0, 0));
             }
-            stickTip = Mat.Pivot(armR, "tip", new Vector3(0, -1.95f, 3.2f));
+            stickTip = Mat.Pivot(armR, "tip", new Vector3(0, hand, 3.2f));
 
             // 周りを回る英語の辞書
-            bookOrbit = Mat.Pivot(inner, "bookOrbit", new Vector3(0, 4.0f, 0));
+            bookOrbit = Mat.Pivot(inner, "bookOrbit", new Vector3(0, 4.3f, 0));
             var book = Mat.Pivot(bookOrbit, "book", new Vector3(2.4f, 0, 0));
             Mat.Part(book, Mat.Cube, M(new Color(0.95f, 0.93f, 0.86f), 0.02f), Vector3.zero, new Vector3(0.9f, 1.25f, 0.3f));
             var cover = Mat.Toon(Color.white, 0, null, DictCover()); mats.Add(cover);
@@ -174,7 +182,7 @@ namespace AndoBoss
         Func<float, bool> AtkCount()
         {
             var G = Game.I;
-            G.Say(SPick("count"));
+            Speak(SPick("count"));
             Pose = "point";
             int waves = Phase == 2 ? 4 : 3, k = Phase == 2 ? 7 : 5;
             float t = 0; int fired = 0;
@@ -226,7 +234,7 @@ namespace AndoBoss
         Func<float, bool> AtkScythe()
         {
             var G = Game.I;
-            G.Say(SPick("scythe"));
+            Speak(SPick("scythe"));
             Pose = "scythe";
             PoseU = 0;
             int swings = Phase == 2 ? 2 : 1;
@@ -261,7 +269,7 @@ namespace AndoBoss
         Func<float, bool> AtkWords()
         {
             var G = Game.I;
-            G.Say(SPick("words"));
+            Speak(SPick("words"));
             Pose = "raise";
             const string letters = "ENGLISHCOUNTDEATH";
             int n = Phase == 2 ? 9 : 6;
@@ -320,7 +328,7 @@ namespace AndoBoss
         Func<float, bool> AtkMorau()
         {
             var G = Game.I;
-            G.Say(SPick("morau"), 3f);
+            Speak(SPick("morau"), 3f);
             Pose = "point";
             var orb = new GameObject("bullet");
             orb.transform.position = StickTip;
@@ -363,7 +371,10 @@ namespace AndoBoss
         Func<float, bool> AtkWall()
         {
             var G = Game.I;
-            G.Say(SPick("wall"), 3f);
+            var line = SPick("wall");
+            Speak(line, 3f);
+            // 言っちゃいけないことは放送禁止の「ピー」音でかき消す
+            if (line.Contains("ピー")) Fx.Later(0.55f, () => Sfx.Play("bleep", 0.45f));
             Pose = "roar";
             int walls = Phase == 2 ? 4 : 3;
             for (int i = 0; i < walls; i++)
@@ -430,7 +441,7 @@ namespace AndoBoss
         Func<float, bool> AtkHakai()
         {
             var G = Game.I;
-            G.Say(SPick("hakai"), 3f);
+            Speak(SPick("hakai"), 3f);
             G.OnHakai();
             Pose = "raise";
             lockFace = false;

@@ -230,6 +230,16 @@ namespace AndoBoss
                     Add("whisper" + k, b, 0.55f);
                 }
             }
+            // 放送禁止の「ピー」音（テレビの自主規制っぽく）
+            {
+                var b = Buffer(0.75f);
+                for (int i = 0; i < b.Length; i++)
+                {
+                    float t = i / (float)SR;
+                    b[i] = Mathf.Sin(2 * Mathf.PI * 1000 * t) * 0.35f * Mathf.Clamp01(t * 80) * Mathf.Clamp01((0.75f - t) * 80);
+                }
+                Add("bleep", b, 0.5f);
+            }
             // カウントがつく音：重い判子＋鎖のようなジャラッとした音
             {
                 var b = Impact(0.9f, 120, 45, 0.15f, 700, 0.06f, 2f);

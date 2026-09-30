@@ -10,6 +10,10 @@ namespace AndoBoss
     public partial class Boss : MonoBehaviour
     {
         public const float MaxHp = 16000f;
+        // ダブル（2人同時）のときは1人あたりのHPを減らす
+        public const float DoubleHp = 11000f;
+        public float HpMax = MaxHp;
+        public Vector3 HomePos = new Vector3(0, 0, 7);
         public const float Radius = 1.7f;
         public const float MaxTough = 4200f;
 
@@ -208,7 +212,8 @@ namespace AndoBoss
 
         public void ResetState()
         {
-            Pos = new Vector3(0, 0, 7); Y = 0; Face = Mathf.PI; Hp = MaxHp; LagHp = MaxHp; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
+            HpMax = Game.IsDouble ? DoubleHp : MaxHp;
+            Pos = HomePos; Y = 0; Face = Mathf.PI; Hp = HpMax; LagHp = HpMax; Tough = MaxTough; BreakT = 0; Flash = 0; SinkT = 0;
             Phase = 1; PendingPhase = false; Pose = "idle"; FreezeT = 0; DefDownT = 0; Aura = Elem.None; AuraT = 0; hakaiCd = 2f; PoseU = 0; sansouCd = 20f; practiceCd = 0; said75 = said25 = false; lockFace = false; walking = false;
             restT = 1.2f; lastAtk = null; atk = null;
             aura.SetActive(false);
@@ -225,10 +230,10 @@ namespace AndoBoss
         public void OnDamaged(float dmg, float toughDmg)
         {
             Flash = 0.12f;
-            float r = Hp / MaxHp;
+            float r = Hp / HpMax;
             if (Phase == 1 && r <= 0.5f) PendingPhase = true;
-            if (!said75 && r <= 0.75f) { said75 = true; Game.I.Say(Line("hp75")); }
-            if (!said25 && r <= 0.25f) { said25 = true; Game.I.Say(Line("hp25")); }
+            if (!said75 && r <= 0.75f) { said75 = true; Speak(Line("hp75")); }
+            if (!said25 && r <= 0.25f) { said25 = true; Speak(Line("hp25")); }
             if (!Broken && Hp > 0)
             {
                 Tough -= toughDmg;
@@ -243,7 +248,7 @@ namespace AndoBoss
             atk = null; lockFace = false; Y = 0;
             Pose = "dizzy";
             dizzy.SetActive(true);
-            Game.I.OnBreak();
+            Game.I.OnBreak(this);
         }
 
         public void Die()
@@ -296,7 +301,7 @@ namespace AndoBoss
                     dizzy.SetActive(false);
                     Pose = "idle";
                     restT = 0.6f;
-                    G.Say(Line("breakEnd"));
+                    Speak(Line("breakEnd"));
                 }
                 Animate(dt);
                 return;
@@ -375,7 +380,7 @@ namespace AndoBoss
         public void OnHitPlayer()
         {
             if (Time.time < practiceCd) return;
-            if (Random.value < 0.35f) { practiceCd = Time.time + 9; Game.I.Say(Line("hit")); }
+            if (Random.value < 0.35f) { practiceCd = Time.time + 9; Speak(Line("hit")); }
         }
 
         public void Freeze(float sec)
@@ -384,6 +389,9 @@ namespace AndoBoss
             if (sec > 0) { atk = null; lockFace = false; Y = 0; Pose = "idle"; }
             iceBlock.SetActive(sec > 0);
         }
+        // セリフは自分の名前で言う（ダブルのときにどっちが話したか分かるように）
+        void Speak(string text, float sec = 2.6f) => Game.I.Say(text, sec, Name);
+
         static string Pick(string k) { var a = Lines[k]; return a[Random.Range(0, a.Length)]; }
 
         // 場面ごとの決まったセリフ（ボスごと）
@@ -405,7 +413,7 @@ namespace AndoBoss
         Func<float, bool> AtkLightning()
         {
             var G = Game.I;
-            G.Say(Pick("lightning"));
+            Speak(Pick("lightning"));
             Pose = "raise";
             int n = Phase == 2 ? 7 : 4;
             float gap = Phase == 2 ? 0.14f : 0.2f;
@@ -432,7 +440,7 @@ namespace AndoBoss
         Func<float, bool> AtkShots()
         {
             var G = Game.I;
-            G.Say(Pick("shots"));
+            Speak(Pick("shots"));
             Pose = "point";
             int waves = Phase == 2 ? 3 : 2, k = Phase == 2 ? 7 : 5;
             float t = 0; int fired = 0;
@@ -455,7 +463,7 @@ namespace AndoBoss
         Func<float, bool> AtkSlam()
         {
             var G = Game.I;
-            G.Say(Pick("slam"));
+            Speak(Pick("slam"));
             Pose = "slam";
             int waves = Phase == 2 ? 2 : 1;
             float t = 0; bool landed = false;
@@ -504,7 +512,7 @@ namespace AndoBoss
         Func<float, bool> AtkIyaiya()
         {
             var G = Game.I;
-            G.Say(Pick("iyaiya"));
+            Speak(Pick("iyaiya"));
             Pose = "iyaiya";
             int hops = Phase == 2 ? 6 : 4;
             float hopDur = Phase == 2 ? 0.46f : 0.58f;
@@ -550,7 +558,7 @@ namespace AndoBoss
         Func<float, bool> AtkTrans()
         {
             var G = Game.I;
-            G.Say(Pick("trans"));
+            Speak(Pick("trans"));
             Pose = "point";
             var target = ClampArena(Player.Flat(G.Player.Pos));
             var start = StickTip;
@@ -619,7 +627,7 @@ namespace AndoBoss
         Func<float, bool> AtkSansou()
         {
             var G = Game.I;
-            G.Say(Pick("sansou"), 3f);
+            Speak(Pick("sansou"), 3f);
             G.OnSansou();
             Pose = "raise";
             lockFace = true;
@@ -693,7 +701,7 @@ namespace AndoBoss
         Func<float, bool> AtkLaser()
         {
             var G = Game.I;
-            G.Say(Pick("laser"));
+            Speak(Pick("laser"));
             Pose = "point";
             lockFace = true;
             var P = G.Player;
@@ -764,7 +772,7 @@ namespace AndoBoss
         Func<float, bool> AtkSpiral()
         {
             var G = Game.I;
-            G.Say(Pick("spiral"));
+            Speak(Pick("spiral"));
             Pose = "spin";
             lockFace = true;
             float t = 0, shotT = 0, ang = Random.value * Mathf.PI * 2;
@@ -791,11 +799,11 @@ namespace AndoBoss
         Func<float, bool> AtkRoar()
         {
             var G = Game.I;
-            G.Say(Line("phase2"), 2.6f);
+            Speak(Line("phase2"), 2.6f);
             Pose = "roar";
             aura.SetActive(true);
             auraPs.Play();
-            G.OnPhase2();
+            G.OnPhase2(this);
             Fx.Ring(Pos, 14, Mat.Electro, 0.8f, 3f);
             float t = 0;
             return dt =>
@@ -927,7 +935,7 @@ namespace AndoBoss
             else if (!Alive) eyeGlow.SetColor("_Color", new Color(1, 0.2f, 0.2f, 0));
         }
 
-        public Vector3 HeadPos => new Vector3(Pos.x, Y + 4.6f, Pos.z);
+        public Vector3 HeadPos => new Vector3(Pos.x, Y + (IsSuga ? 5.9f : 4.6f), Pos.z);
         public Vector3 StickTip => stickTip.position;
     }
 

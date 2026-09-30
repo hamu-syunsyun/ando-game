@@ -14,7 +14,11 @@ namespace AndoBoss
         int active;
         public int Active => active;
         public Player Player => Party[active];
-        public Boss Boss;
+        // ボスは2人ぶん作っておき、選んだほうだけ出す（ダブルのときは両方）
+        public Boss[] Bosses;
+        Boss target;
+        // いま狙っている先生（ダブルのときはプレイヤーに近いほう）
+        public Boss Boss => target;
         public CameraRig Cam;
         public Hud Hud;
         public Music Music;
@@ -25,7 +29,10 @@ namespace AndoBoss
         // 菅原先生のカウント（5つで単位消滅）
         public const int MaxCount = 5;
         public int Counts;
-        public static int BossKind; // 0 = 安東先生, 1 = 菅原先生
+        public static int BossKind; // 0 = 安東先生, 1 = 菅原先生, 2 = ダブル（超ハード）
+        public static bool IsDouble => BossKind == 2;
+        public const float DoubleTimeLimit = 270f;
+        int KillBonus => IsDouble ? 3000 : 1000;
         int selectStep;             // 0 = ボス選択, 1 = キャラ選択
         // パーティ共通のHP・スタミナ・デバフ
         public const float MaxStam = 150f;
@@ -41,7 +48,7 @@ namespace AndoBoss
         public bool Cinematic;
         bool win; string loseReason;
         bool energyAnnounced;
-        string BestKey => BossKind == 1 ? "suga_boss_best" : "ando_boss_best";
+        string BestKey => BossKind == 2 ? "double_boss_best" : BossKind == 1 ? "suga_boss_best" : "ando_boss_best";
 
         // 画風：0 = アニメ調, 1 = リアル調（F3 で切り替え）
         public static int Style = 0;
@@ -92,8 +99,15 @@ namespace AndoBoss
                 Party[i] = new GameObject("Player_" + CharDef.All[i].Name).AddComponent<Player>();
                 Party[i].Build(CharDef.All[i]);
             }
-            Boss = new GameObject("Boss").AddComponent<Boss>();
-            Boss.Build();
+            Bosses = new Boss[2];
+            for (int i = 0; i < 2; i++)
+            {
+                var b = new GameObject(i == 0 ? "Boss_Ando" : "Boss_Suga").AddComponent<Boss>();
+                b.Kind = i;
+                b.Build();
+                Bosses[i] = b;
+            }
+            target = Bosses[0];
 
             ResetRound();
             GoTitle();
@@ -112,19 +126,75 @@ namespace AndoBoss
             Party[active].gameObject.SetActive(true);
             PartyHp = Player.MaxHp;
             swapCd = 0;
-            Boss.ResetState();
-            TimeLeft = TimeLimit;
+            ApplyBossSetup();
+            TimeLeft = IsDouble ? DoubleTimeLimit : TimeLimit;
             Dealt = Combo = MaxCombo = Perfects = Reactions = 0;
             comboT = 0;
             energyAnnounced = false;
             Cinematic = false;
-            Sky.SetStorm(BossKind == 1 ? 0.35f : 0);
+            Sky.SetStorm(StormFor(BossKind));
             Counts = 0;
             if (PostFX.I) { PostFX.I.Desaturate(0); PostFX.I.SetTint(Color.white); PostFX.I.LowHp = 0; }
             Music.Duck(false);
             Music.SetMuffled(false);
-            Music.SetPitch(BossKind == 1 ? 0.94f : 1f);
-            if (Boss.Kind != BossKind) Boss.SetKind(BossKind);
+            Music.SetPitch(PitchFor(BossKind));
+        }
+
+        static float StormFor(int k) => k == 2 ? 0.6f : k == 1 ? 0.35f : 0;
+        static float PitchFor(int k) => k == 2 ? 0.97f : k == 1 ? 0.94f : 1f;
+
+        // 選んだ先生だけ出す。ダブルのときは左右に並べる
+        void ApplyBossSetup()
+        {
+            for (int i = 0; i < Bosses.Length; i++)
+            {
+                var b = Bosses[i];
+                b.gameObject.SetActive(IsDouble || i == BossKind);
+                b.HomePos = IsDouble ? new Vector3(i == 0 ? -5.5f : 5.5f, 0, 8) : new Vector3(0, 0, 7);
+                b.ResetState();
+            }
+            target = IsDouble ? Bosses[0] : Bosses[BossKind];
+        }
+
+        public Boss OtherBoss(Boss b)
+        {
+            if (!IsDouble) return null;
+            return b == Bosses[0] ? Bosses[1] : Bosses[0];
+        }
+
+        // 画面の中心にしたい位置（ダブルのときは2人の真ん中）
+        Vector3 BossFocus => IsDouble ? (Bosses[0].Pos + Bosses[1].Pos) * 0.5f : Boss.Pos;
+
+        void TickBosses(float dt)
+        {
+            foreach (var b in Bosses) if (b.gameObject.activeSelf) b.Tick(dt);
+            if (!IsDouble) return;
+            // 2人が重ならないように押しのけ合う
+            Boss a = Bosses[0], c = Bosses[1];
+            if (a.Alive && c.Alive)
+            {
+                var d = Player.Flat(c.Pos - a.Pos);
+                float m = d.magnitude;
+                if (m < 4.5f)
+                {
+                    var push = (m > 0.01f ? d / m : Vector3.right) * (4.5f - m) * 0.5f;
+                    a.Pos -= push; c.Pos += push;
+                }
+            }
+            if (State == Mode.Battle) PickTarget();
+        }
+
+        // プレイヤーに近いほうを狙う（ちらつかないよう、今の相手を少しひいきする）
+        void PickTarget()
+        {
+            Boss best = null; float bd = float.MaxValue;
+            foreach (var b in Bosses)
+            {
+                if (!b.gameObject.activeSelf || !b.Alive) continue;
+                float d = Player.Flat(b.Pos - Player.Pos).magnitude - (b == target ? 2.5f : 0);
+                if (d < bd) { bd = d; best = b; }
+            }
+            if (best != null) target = best;
         }
 
         internal void GoTitle()
@@ -134,7 +204,7 @@ namespace AndoBoss
             Hud.ShowTitle(PlayerPrefs.GetInt(BestKey, 0));
             Music.SetTitle();
             Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
-            Boss.Face = Mathf.PI;
+            foreach (var b in Bosses) b.Face = Mathf.PI;
         }
 
         // ---- キャラ選択 ----
@@ -183,7 +253,7 @@ namespace AndoBoss
                 p.Face = Player.TurnTo(p.Face, i == StartChar ? Mathf.PI + 0.15f : Mathf.PI, Time.deltaTime * 6);
                 p.Tick(Time.deltaTime);
             }
-            Boss.Tick(Time.deltaTime);
+            TickBosses(Time.deltaTime);
             if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoIntro();
             if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoSelect();
         }
@@ -191,27 +261,30 @@ namespace AndoBoss
         internal void SelectBoss(int k)
         {
             BossKind = k;
-            Boss.SetKind(BossKind);
-            Boss.Face = Mathf.PI;
-            Sky.SetStorm(BossKind == 1 ? 0.35f : 0);
-            Music.SetPitch(BossKind == 1 ? 0.94f : 1f);
+            ApplyBossSetup();
+            foreach (var b in Bosses) b.Face = Mathf.PI;
+            Sky.SetStorm(StormFor(BossKind));
+            Music.SetPitch(PitchFor(BossKind));
             Hud.ShowBossSelect(BossKind);
         }
 
         void UpdateBossSelect()
         {
             int before = BossKind;
-            if (GameInput.Down(GameInput.K.Left) || GameInput.Down(GameInput.K.Right)) BossKind = 1 - BossKind;
+            if (GameInput.Down(GameInput.K.Left)) BossKind = (BossKind + 2) % 3;
+            if (GameInput.Down(GameInput.K.Right)) BossKind = (BossKind + 1) % 3;
             if (GameInput.Down(GameInput.K.Char1)) BossKind = 0;
             if (GameInput.Down(GameInput.K.Char2)) BossKind = 1;
+            if (GameInput.Down(GameInput.K.Char3)) BossKind = 2;
             if (before != BossKind)
             {
                 Sfx.Play("swap", 0.6f, 0.9f);
                 SelectBoss(BossKind);
             }
-            var bp = Boss.Pos;
-            Cam.Cinematic(bp + new Vector3(2.6f, 3.4f, -13.5f), bp + Vector3.up * 2.3f, 40, stateT < 0.05f);
-            Boss.Tick(Time.deltaTime);
+            var bp = BossFocus;
+            float back = IsDouble ? 1.45f : 1f;
+            Cam.Cinematic(bp + new Vector3(2.6f, 3.4f, -13.5f) * back, bp + Vector3.up * 3.3f, 40, stateT < 0.05f);
+            TickBosses(Time.deltaTime);
             TickParty(Time.deltaTime);
             if (stateT > 0.4f && GameInput.Down(GameInput.K.Confirm)) GoCharSelect();
             if (GameInput.Down(GameInput.K.Title) || GameInput.Down(GameInput.K.Back)) GoTitle();
@@ -226,7 +299,12 @@ namespace AndoBoss
             Sfx.Play("confirm", 0.8f);
             Sfx.Play("roar", 0.6f, 1.2f);
             Music.Mix(0, 0.9f, 0.9f, 0, 0.6f);
-            Say(Boss.Line("intro"), 2.8f);
+            if (IsDouble)
+            {
+                Say("……今日は菅原先生と二人がかりだど。", 1.6f, "安東先生");
+                Fx.Later(1.6f, () => { if (State == Mode.Intro) Say("カウント、たっぷりあげるよ。", 1.8f, "菅原先生"); });
+            }
+            else Say(Boss.Line("intro"), 2.8f);
             LockCursor();
         }
 
@@ -326,31 +404,32 @@ namespace AndoBoss
         {
             titleOrbit += Time.unscaledDeltaTime * 0.12f;
             var c = new Vector3(Mathf.Sin(titleOrbit) * 15, 5 + Mathf.Sin(titleOrbit * 0.7f) * 1.5f, Mathf.Cos(titleOrbit) * 15);
-            Cam.Cinematic(c, Boss.Pos + Vector3.up * 3.2f + new Vector3(Mathf.Cos(titleOrbit), 0, -Mathf.Sin(titleOrbit)) * 4, 50, stateT < 0.1f);
+            Cam.Cinematic(c, BossFocus + Vector3.up * 3.2f + new Vector3(Mathf.Cos(titleOrbit), 0, -Mathf.Sin(titleOrbit)) * 4, 50, stateT < 0.1f);
             TickParty(Time.deltaTime);
-            Boss.Tick(Time.deltaTime);
+            TickBosses(Time.deltaTime);
             if (stateT > 0.5f && GameInput.Down(GameInput.K.Confirm)) GoSelect();
         }
 
         void UpdateIntro()
         {
             float t = stateT;
-            var B = Boss; var P = Player;
+            var F = BossFocus; var P = Player;
+            float far = IsDouble ? 2f : 1f;
             if (t < 1.8f)
             {
                 float u = t / 1.8f;
-                var from = B.Pos + new Vector3(2.5f, 1.2f, -5.5f);
-                var to = B.Pos + new Vector3(1.2f, 3.8f, -4.2f);
-                Cam.Cinematic(Vector3.Lerp(from, to, u), B.Pos + Vector3.up * (3.6f + u * 0.6f), 42, t < 0.05f);
-                if (t > 0.9f && t - Time.unscaledDeltaTime <= 0.9f) { Sfx.Play("thunder", 0.6f); Fx.Bolt(B.Pos + new Vector3(4, 0, 2), Mat.Electro); Cam.Shake(0.3f); }
+                var from = F + new Vector3(2.5f, 1.2f, -5.5f) * far;
+                var to = F + new Vector3(1.2f, 3.8f, -4.2f) * far;
+                Cam.Cinematic(Vector3.Lerp(from, to, u), F + Vector3.up * (3.6f + u * 0.6f), 42, t < 0.05f);
+                if (t > 0.9f && t - Time.unscaledDeltaTime <= 0.9f) { Sfx.Play("thunder", 0.6f); Fx.Bolt(F + new Vector3(4, 0, 2) * far, Mat.Electro); Cam.Shake(0.3f); }
             }
             else
             {
-                var behind = P.Pos + new Vector3(0, 2.6f, -6);
-                Cam.Cinematic(behind, (P.Pos + B.Pos) * 0.5f + Vector3.up * 2f, 55);
+                var behind = P.Pos + new Vector3(0, 2.6f, -6) * (IsDouble ? 1.3f : 1f);
+                Cam.Cinematic(behind, (P.Pos + F) * 0.5f + Vector3.up * 2f, 55);
             }
             TickParty(Time.deltaTime);
-            Boss.Tick(Time.deltaTime);
+            TickBosses(Time.deltaTime);
             if (t > 3.3f || (t > 0.8f && GameInput.Down(GameInput.K.Confirm))) GoBattle();
         }
 
@@ -361,7 +440,7 @@ namespace AndoBoss
             swapCd -= dt;
             // キャラ交代はなし（最初に選んだキャラで最後まで戦う）
             TickParty(dt);
-            Boss.Tick(dt);
+            TickBosses(dt);
 
             comboT -= dt;
             if (comboT <= 0 && Combo > 0) Combo = 0;
@@ -409,7 +488,7 @@ namespace AndoBoss
         void UpdateEnding(float dt)
         {
             TickParty(dt);
-            Boss.Tick(dt);
+            TickBosses(dt);
             if (win)
             {
                 var B = Boss;
@@ -453,7 +532,7 @@ namespace AndoBoss
         // 菅原先生の攻撃に当たるとカウントがたまる。5つで単位消滅
         public void AddCount(int n)
         {
-            if (State != Mode.Battle || !Boss.IsSuga) return;
+            if (State != Mode.Battle || BossKind == 0) return;
             Counts = Mathf.Min(MaxCount, Counts + n);
             Hud.CountPop();
             Sfx.Play("stamp", 1f, 0.7f);
@@ -463,13 +542,13 @@ namespace AndoBoss
             if (Counts >= MaxCount)
             {
                 Hud.Banner("カウント5", "単位消滅", new Color(1f, 0.25f, 0.3f), 2.4f);
-                Say(Boss.Line("count5"), 3.5f);
+                Say(Bosses[1].Line("count5"), 3.5f, "菅原先生");
                 Lose("単位消滅…");
                 return;
             }
             Hud.Banner($"カウント {Counts}", Counts == MaxCount - 1 ? "リーチ！あと1つで単位消滅" : $"あと{MaxCount - Counts}つで単位消滅", new Color(1f, 0.3f, 0.35f), 1.1f);
             string[] says = { "", "はい、カウント1。", "カウント2。", "あと2つで単位なくなるよ？", "……リーチだね。" };
-            Say(says[Counts], 2.2f);
+            Say(says[Counts], 2.2f, "菅原先生");
         }
 
         public void OnHakai()
@@ -540,7 +619,33 @@ namespace AndoBoss
                 P.Energy = Mathf.Min(100, P.Energy + 1);
                 if (Random.value < 0.2f) SpawnOrbs(hitPos, 1);
             }
-            if (B.Hp <= 0) Win();
+            if (B.Hp <= 0)
+            {
+                var O = OtherBoss(B);
+                if (O != null && O.Alive) BossDown(B, O); else Win();
+            }
+        }
+
+        // ダブルで1人目を倒したとき。残った先生は本気モードになる
+        void BossDown(Boss b, Boss rest)
+        {
+            b.Die();
+            Hud.Banner($"{b.Name} 撃破！", $"残るは{rest.Name}！", Mat.Gold, 2.2f);
+            Say(b.IsSuga ? "……ノーカウントには、ならないか。" : "……あどは頼むど、菅原先生。", 2.4f, b.Name);
+            Fx.Later(2.4f, () => { if (State == Mode.Battle) Say(rest.IsSuga ? "……よくも。カウント、倍にしてあげる。" : "菅原先生の分まで、やっでやる！", 2.4f, rest.Name); });
+            // 残った先生は、少し間をおいて本気モードになる
+            Fx.Later(3.0f, () => { if (State == Mode.Battle && rest.Alive && rest.Phase == 1) rest.PendingPhase = true; });
+            Sfx.Play("break", 1f);
+            Sfx.Play("boom", 0.8f);
+            Fx.Slow(0.2f, 0.8f);
+            Fx.HitStop(0.15f);
+            PostFX.I?.Flash(Color.white, 0.5f);
+            PostFX.I?.Radial(0.6f);
+            Cam.Shake(0.8f);
+            Fx.Ring(b.Pos, 8, Mat.Gold, 0.5f, 3f);
+            Fx.Sparks(b.Pos + Vector3.up * 2.5f, Mat.Gold, 40, 1.6f);
+            Fx.Later(0.5f, () => Fx.Confetti(b.Pos + Vector3.up, 120));
+            PickTarget();
         }
 
         public void OnPlayerHurt(float amount)
@@ -573,13 +678,13 @@ namespace AndoBoss
         public void PerfectDodge()
         {
             Perfects++;
-            if (Boss.IsSuga && Counts > 0)
+            if (BossKind != 0 && Counts > 0)
             {
                 // ジャスト回避でカウントを1つ取り消せる
                 Counts--;
                 Hud.CountPop();
                 Fx.Later(0.6f, () => Hud.Banner("カウント取り消し！", $"残りカウント {Counts}", new Color(0.6f, 0.95f, 1f), 1.0f));
-                Say("……今のは、ノーカウント。", 1.8f);
+                Say("……今のは、ノーカウント。", 1.8f, "菅原先生");
             }
             Player.BuffT = 5f;
             Player.Energy = Mathf.Min(100, Player.Energy + 15);
@@ -594,7 +699,7 @@ namespace AndoBoss
             Cam.FovPunch(-6);
         }
 
-        public void OnBreak()
+        public void OnBreak(Boss b)
         {
             Hud.Banner("BREAK!!", "理論武装 崩壊！　5秒間ダメージ1.3倍", Mat.Gold, 1.6f);
             Sfx.Play("break", 1f);
@@ -602,15 +707,15 @@ namespace AndoBoss
             PostFX.I?.Radial(0.6f);
             PostFX.I?.Flash(new Color(1, 0.9f, 0.5f), 0.4f);
             Cam.Shake(0.5f);
-            Fx.Stars(Boss.HeadPos, Mat.Gold, 30);
-            Fx.Sparks(Boss.Pos + Vector3.up * 2.5f, Mat.Gold, 40, 1.6f);
-            Fx.Ring(Boss.Pos, 8, Mat.Gold, 0.5f, 3f);
-            Say(Boss.Line("break"), 2f);
+            Fx.Stars(b.HeadPos, Mat.Gold, 30);
+            Fx.Sparks(b.Pos + Vector3.up * 2.5f, Mat.Gold, 40, 1.6f);
+            Fx.Ring(b.Pos, 8, Mat.Gold, 0.5f, 3f);
+            Say(b.Line("break"), 2f, b.Name);
         }
 
-        public void OnPhase2()
+        public void OnPhase2(Boss b)
         {
-            Hud.Banner("本気モード", Boss.IsSuga ? "菅原先生の攻撃が激しくなった！「北の破壊神」に注意" : "安東先生の攻撃が激しくなった！", new Color(1f, 0.5f, 0.85f), 2f);
+            Hud.Banner("本気モード", b.IsSuga ? "菅原先生の攻撃が激しくなった！「北の破壊神」に注意" : "安東先生の攻撃が激しくなった！", new Color(1f, 0.5f, 0.85f), 2f);
             Sky.SetStorm(1);
             Music.SetBattle(true);
             Sfx.Play("roar", 1f);
@@ -624,7 +729,7 @@ namespace AndoBoss
                 Fx.Later(0.15f * i, () =>
                 {
                     float a = k / 6f * Mathf.PI * 2;
-                    Fx.Bolt(Boss.Pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 6, new Color(1f, 0.5f, 0.85f), 0.3f);
+                    Fx.Bolt(b.Pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 6, new Color(1f, 0.5f, 0.85f), 0.3f);
                 });
             }
         }
@@ -701,7 +806,7 @@ namespace AndoBoss
             Cinematic = true;
             Hud.Letterbox(true);
             Say(Boss.Line("win"), 4.5f);
-            int bonus = 1000 + Mathf.CeilToInt(TimeLeft) * 20 + Mathf.RoundToInt(PartyHp);
+            int bonus = KillBonus + Mathf.CeilToInt(TimeLeft) * 20 + Mathf.RoundToInt(PartyHp);
             Hud.Banner("撃破！", $"撃破ボーナス +{bonus}", Mat.Gold, 2.6f);
             Fx.Slow(0.15f, 1.4f);
             Fx.HitStop(0.2f);
@@ -791,7 +896,7 @@ namespace AndoBoss
                 win = win,
                 reason = loseReason,
                 dealt = Dealt,
-                killBonus = win ? 1000 : 0,
+                killBonus = win ? KillBonus : 0,
                 timeBonus = win ? Mathf.CeilToInt(Mathf.Max(0, TimeLeft)) * 20 : 0,
                 hpBonus = win ? Mathf.RoundToInt(PartyHp) : 0,
                 perfects = Perfects,
@@ -802,7 +907,9 @@ namespace AndoBoss
                 charName = Player.Def.Name,
             };
             d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus + d.reactions * 20;
-            d.grade = !win ? "不可" : d.total >= 19500 ? "秀" : d.total >= 18700 ? "優" : d.total >= 18000 ? "良" : "可";
+            // ダブルは与ダメージの上限が 22000（+6000）、撃破ボーナスが +2000 なので基準も上げる
+            int off = IsDouble ? 8000 : 0;
+            d.grade = !win ? "不可" : d.total >= 19500 + off ? "秀" : d.total >= 18700 + off ? "優" : d.total >= 18000 + off ? "良" : "可";
             int best = PlayerPrefs.GetInt(BestKey, 0);
             d.record = d.total > best;
             if (d.record) { PlayerPrefs.SetInt(BestKey, d.total); PlayerPrefs.Save(); }

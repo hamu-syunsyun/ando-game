@@ -39,7 +39,7 @@ namespace AndoBoss
             yield return Wait(3f);
             yield return ShotCo("01_title");
             G.GoSelect();
-            if (boss == 1) G.SelectBoss(1);
+            if (boss != 0) G.SelectBoss(boss);
             yield return Wait(1.2f);
             yield return ShotCo("02_bossselect");
             G.GoCharSelect();
@@ -56,7 +56,7 @@ namespace AndoBoss
                 G.DamageBoss(60, Game.HitKind.Normal, G.Boss.Pos + Vector3.up * 2.5f);
                 yield return Wait(0.06f);
             }
-            if (G.Boss.IsSuga)
+            if (Game.BossKind != 0)
             {
                 G.AddCount(1);
                 yield return Wait(0.2f);
@@ -76,6 +76,15 @@ namespace AndoBoss
             yield return Wait(0.3f);
             yield return ShotCo("07_perfect");
             yield return Wait(1.5f);
+            if (Game.IsDouble)
+            {
+                // ダブル：1人目を倒したところ
+                G.Boss.Hp = 1;
+                G.DamageBoss(100, Game.HitKind.Normal, G.Boss.Pos + Vector3.up * 2.5f);
+                yield return Wait(1.2f);
+                yield return ShotCo("075_down");
+                yield return Wait(1.5f);
+            }
             G.Boss.Hp = 1;
             G.DamageBoss(100, Game.HitKind.Normal, G.Boss.Pos + Vector3.up * 2.5f);
             yield return Wait(1.0f);

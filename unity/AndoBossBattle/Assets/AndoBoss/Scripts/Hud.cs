@@ -37,6 +37,9 @@ namespace AndoBoss
         Image hurtEdge, perfectEdge; float hurtA, perfectA;
         Image letterTop, letterBot; float letter, letterTarget;
         float bossBarShake;
+        CanvasGroup subBossGroup;
+        Text subBossName;
+        RectTransform subBossFill;
         Text playerName, skillLabel, burstLabelName, auraText, slowText, defDownText;
         Image auraDot;
         readonly List<(Text name, Image dot, Image ready, RectTransform rt)> partyRows = new List<(Text, Image, Image, RectTransform)>();
@@ -211,6 +214,15 @@ namespace AndoBoss
             tl.gameObject.SetActive(false);
             toughLabel = Label(battle, "理論武装", uiFont, 18, new Color(0.85f, 0.8f, 1f), Vector2.zero, TextAnchor.MiddleRight, 200);
             Place(toughLabel.rectTransform, top, new Vector2(1, 0.5f), new Vector2(-392, -102));
+
+            // ダブル用：もう1人の先生の小さいHPバー
+            var sbg = New(battle, "subBoss", top, top, new Vector2(0, -160), new Vector2(560, 30));
+            subBossGroup = sbg.gameObject.AddComponent<CanvasGroup>();
+            subBossName = Label(sbg, "菅原先生", uiFont, 20, new Color(1, 1, 1, 0.9f), Vector2.zero, TextAnchor.MiddleRight, 220);
+            Place(subBossName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(1, 0.5f), new Vector2(-132, 0));
+            Shadowed(subBossName, new Color(0, 0, 0, 0.8f), 2);
+            Bar(sbg, new Vector2(80, 0), new Vector2(400, 14), new Color(0.15f, 0.1f, 0.15f, 0.9f), out _, new Color(0, 0, 0, 0), out subBossFill, out _, new Color(0.93f, 0.25f, 0.3f), new Vector2(0.5f, 0.5f));
+            subBossGroup.alpha = 0;
 
             var tr = new Vector2(1, 1);
             var tlabel = Label(battle, "残り時間", uiFont, 22, new Color(1, 1, 1, 0.8f), Vector2.zero, TextAnchor.MiddleRight, 300);
@@ -505,25 +517,28 @@ namespace AndoBoss
         {
             { "安東先生", "電気回路担当　〜単位の番人〜", "雷・抵抗器の弾幕・いやいや攻撃\n必殺「三相交流」、トランスで鈍足\nセリフはぜんぶ秋田弁", "#ffd54d" },
             { "菅原先生", "英語担当　〜死神・北の破壊神〜", "攻撃に当たると「カウント」がつく\nカウント5つで単位消滅（即アウト）\nジャスト回避でカウントを1つ取り消せる", "#ff4d5e" },
+            { "安東＆菅原", "超ハード　〜ダブル補講〜", "2人の先生が同時に襲ってくる\nカウント5で単位消滅もそのまま\n1人倒すと、残った先生が本気になる", "#c070ff" },
         };
+
+        const float BossCardGap = 600;
 
         void BuildBossSelect()
         {
             var head = Label(bossSel, "たおす先生を選んでください", uiFont, 44, Color.white, new Vector2(0, 450), TextAnchor.MiddleCenter, 1600);
             Shadowed(head, new Color(0.15f, 0.05f, 0.3f), 3);
-            var help = Label(bossSel, "← → か 1・2 で選ぶ　／　Enter・クリックで決定　／　T でタイトルへ", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
+            var help = Label(bossSel, "← → か 1・2・3 で選ぶ　／　Enter・クリックで決定　／　T でタイトルへ", uiFont, 26, new Color(1, 1, 1, 0.85f), new Vector2(0, -505), TextAnchor.MiddleCenter, 1800);
             Shadowed(help, new Color(0, 0, 0, 0.8f), 2);
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < BossInfo.GetLength(0); i++)
             {
                 ColorUtility.TryParseHtmlString(BossInfo[i, 3], out var c);
-                var card = New(bossSel, "boss" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 0.5f) * 700, -290), new Vector2(660, 360));
+                var card = New(bossSel, "boss" + i, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * BossCardGap, -290), new Vector2(570, 360));
                 var border = Img(card, c, Mat.RoundSprite); border.type = Image.Type.Sliced;
                 var bg = Img(New(card, "bg", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10, -10)), new Color(0.06f, 0.04f, 0.14f, 0.9f), Mat.RoundSprite);
                 bg.type = Image.Type.Sliced;
-                var nm = Label(card, BossInfo[i, 0], bigFont, 60, Color.white, new Vector2(0, 120), TextAnchor.MiddleCenter, 620, 90);
+                var nm = Label(card, BossInfo[i, 0], bigFont, 56, Color.white, new Vector2(0, 120), TextAnchor.MiddleCenter, 540, 90);
                 Shadowed(nm, Color.Lerp(c, Color.black, 0.5f), 3);
-                Label(card, BossInfo[i, 1], uiFont, 28, c, new Vector2(0, 55), TextAnchor.MiddleCenter, 620);
-                var desc = Label(card, BossInfo[i, 2], uiFont, 25, Color.white, new Vector2(0, -60), TextAnchor.MiddleCenter, 620, 150);
+                Label(card, BossInfo[i, 1], uiFont, 27, c, new Vector2(0, 55), TextAnchor.MiddleCenter, 540);
+                var desc = Label(card, BossInfo[i, 2], uiFont, 24, Color.white, new Vector2(0, -60), TextAnchor.MiddleCenter, 540, 150);
                 desc.lineSpacing = 1.15f;
                 bossCards.Add((card, bg, border));
             }
@@ -560,7 +575,14 @@ namespace AndoBoss
         public void ShowIntro()
         {
             introT = 0; letterTarget = 1;
-            bool suga = Game.I.Boss.IsSuga;
+            if (Game.IsDouble)
+            {
+                introSmall.text = "電気回路担当 × 英語担当";
+                introBig.text = "安東＆菅原";
+                introSub.text = "〜 超ハード・ダブル補講 〜";
+                return;
+            }
+            bool suga = Game.BossKind == 1;
             introSmall.text = suga ? "英語担当" : "電気回路担当";
             introBig.text = suga ? "菅原 先生" : "安東 先生";
             introSub.text = suga ? "〜 死神・北の破壊神 〜" : "〜 単位の番人 〜";
@@ -809,7 +831,7 @@ namespace AndoBoss
                     ColorUtility.TryParseHtmlString(BossInfo[i, 3], out var bc);
                     c.border.color = on ? bc : new Color(bc.r, bc.g, bc.b, 0.25f);
                     c.bg.color = on ? new Color(0.1f, 0.07f, 0.2f, 0.95f) : new Color(0.04f, 0.03f, 0.08f, 0.8f);
-                    c.rt.anchoredPosition = new Vector2((i - 0.5f) * 700, -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - bossT * 3) * 300);
+                    c.rt.anchoredPosition = new Vector2((i - 1) * BossCardGap, -290 + (on ? 20 : 0) - Mathf.Max(0, 1 - bossT * 3) * 300);
                 }
             }
             if (select.gameObject.activeSelf)
@@ -839,8 +861,16 @@ namespace AndoBoss
         void UpdateBattle(float dt, Game G)
         {
             var B = G.Boss; var P = G.Player;
-            SetFill(bossFill, B.Hp / Boss.MaxHp);
-            SetFill(bossLag, B.LagHp / Boss.MaxHp);
+            SetFill(bossFill, B.Hp / B.HpMax);
+            SetFill(bossLag, B.LagHp / B.HpMax);
+            // ダブルのときは、もう1人の先生のHPを小さく表示する
+            var O = G.OtherBoss(B);
+            subBossGroup.alpha = O != null ? 1 : 0;
+            if (O != null)
+            {
+                SetFill(subBossFill, O.Hp / O.HpMax);
+                subBossName.text = O.Alive ? O.Name + (O.Phase == 2 ? "〔本気〕" : "") : O.Name + "　撃破！";
+            }
             bossFillImg.color = B.Phase == 2 ? Color.Lerp(new Color(0.85f, 0.2f, 0.7f), new Color(1f, 0.3f, 0.4f), 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 5)) : new Color(0.93f, 0.25f, 0.3f);
             bossBarShake = Mathf.MoveTowards(bossBarShake, 0, dt * 5);
             bossFill.parent.parent.GetComponent<RectTransform>().anchoredPosition = new Vector2(Random.Range(-1f, 1f) * bossBarShake * 6, -80 + Random.Range(-1f, 1f) * bossBarShake * 4);
@@ -861,7 +891,7 @@ namespace AndoBoss
             string bn = B.IsSuga ? "英語担当・菅原先生" : "電気回路担当・安東先生";
             bossName.text = B.Phase == 2 ? bn + "〔本気〕" : bn;
             // カウント表示（菅原先生のときだけ）
-            countGroup.alpha = B.IsSuga ? 1 : 0;
+            countGroup.alpha = Game.BossKind != 0 ? 1 : 0;
             countPop = Mathf.MoveTowards(countPop, 0, dt * 3);
             countRt.localScale = Vector3.one * (1 + countPop * 0.25f);
             for (int i = 0; i < countSlots.Count; i++)
