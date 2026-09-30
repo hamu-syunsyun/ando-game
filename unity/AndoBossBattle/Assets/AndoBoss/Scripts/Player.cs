@@ -7,7 +7,7 @@ namespace AndoBoss
     // 見た目・攻撃力・スキル・奥義は CharDef で切り替える
     public class Player : MonoBehaviour
     {
-        public float MaxHp => Def.MaxHp;
+        public float MaxHp => Def.MaxHp * Game.PlayerHpMul; // 難易度で増える
         public CharDef Def;
 
         // 状態（HPとスタミナはパーティ共通なので Game が持つ）

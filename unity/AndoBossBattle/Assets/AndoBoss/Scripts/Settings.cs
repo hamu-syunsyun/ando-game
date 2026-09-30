@@ -12,12 +12,15 @@ namespace AndoBoss
         public static readonly string[] DiffNotes =
         {
             "受けるダメージ少なめ・ボスのHP 7割・攻撃の間隔ゆっくり（点数×0.7）",
-            "ふつうの強さ（点数×1.0）",
-            "受けるダメージ多め・ボスのHP 1.4倍・攻撃の間隔せまめ（点数×1.2）",
-            "受けるダメージ大・ボスのHP 1.9倍・休みなく攻撃してくる（点数×1.5）",
+            "ふつうの強さ・自分の体力 1.2倍（点数×1.0）",
+            "受けるダメージ多め・ボスのHP 1.15倍・自分の体力 1.45倍（点数×1.2）",
+            "受けるダメージ大・ボスのHP 1.3倍・自分の体力 1.75倍（点数×1.5）",
         };
         static readonly float[] DiffDmg = { 0.8f, 1.4f, 1.8f, 2.3f };
-        static readonly float[] DiffHp = { 0.7f, 1f, 1.4f, 1.9f };
+        static readonly float[] DiffHp = { 0.7f, 1f, 1.15f, 1.3f };
+        // 自分（プレイヤー）の体力：難易度を上げるごとに増える（攻撃が激しくなるぶん、耐えられるように）
+        static readonly float[] DiffPlayerHp = { 1f, 1.2f, 1.45f, 1.75f };
+        public static float PlayerHpMul => DiffPlayerHp[Difficulty];
         static readonly float[] DiffRest = { 1.5f, 1f, 0.85f, 0.7f };
         static readonly float[] DiffScore = { 0.7f, 1f, 1.2f, 1.5f };
         public static float BossHpMul => DiffHp[Difficulty];
