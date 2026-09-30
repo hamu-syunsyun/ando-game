@@ -42,7 +42,7 @@ namespace AndoBoss
         float drinkT;
         // 難しさの調整：ボスの攻撃の強さ・こちらの攻撃の強さ
         public float EnemyDmgMul = 1.4f; // 難易度で変わる（ResetRound で設定）
-        public const float PlayerDmgMul = 0.85f;
+        public const float PlayerDmgMul = 1.1f; // 全員の攻撃力（前は 0.85）
         float comboT, stateT, titleOrbit, swapCd;
         bool paused;
         public bool Cinematic;
@@ -123,7 +123,7 @@ namespace AndoBoss
             Fx.ClearAll();
             foreach (var o in FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
             EnemyDmgMul = DiffDmg[Difficulty];
-            PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(15f, 22f);
+            PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(12f, 17f);
             foreach (var d in FindObjectsByType<Drink>(FindObjectsSortMode.None)) Destroy(d.gameObject);
             foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
             active = StartChar;
@@ -405,7 +405,7 @@ namespace AndoBoss
 
         void TickParty(float dt)
         {
-            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(MaxStam, PartyStam + dt * 40);
+            if (StamDelay > 0) StamDelay -= dt; else PartyStam = Mathf.Min(MaxStam, PartyStam + dt * 55);
             SlowT = Mathf.Max(0, SlowT - dt);
             for (int i = 0; i < Party.Length; i++)
             {
@@ -473,7 +473,7 @@ namespace AndoBoss
             drinkT -= dt;
             if (drinkT <= 0)
             {
-                drinkT = Random.Range(18f, 26f);
+                drinkT = Random.Range(14f, 20f);
                 if (FindObjectsByType<Drink>(FindObjectsSortMode.None).Length < 2) Drink.Spawn();
             }
 
@@ -634,7 +634,7 @@ namespace AndoBoss
 
             if (kind == HitKind.Normal)
             {
-                P.Energy = Mathf.Min(100, P.Energy + 1);
+                P.Energy = Mathf.Min(100, P.Energy + 1.5f);
                 if (Random.value < 0.2f) SpawnOrbs(hitPos, 1);
             }
             if (B.Hp <= 0)
@@ -713,7 +713,7 @@ namespace AndoBoss
             }
             if (Player.Def.Weapon == Weapon.Spear && !canceled) Fx.Later(0.5f, () => Say("ぼくてんさいだから！", 1.6f, Player.Def.Name));
             Player.BuffT = 5f;
-            Player.Energy = Mathf.Min(100, Player.Energy + 15);
+            Player.Energy = Mathf.Min(100, Player.Energy + 20);
             Fx.Slow(0.22f, 0.9f);
             Hud.Perfect();
             Hud.Banner("ジャスト回避！", "5秒間 会心率アップ", new Color(0.6f, 0.95f, 1f), 1.0f);
@@ -818,7 +818,7 @@ namespace AndoBoss
         {
             // 出ているキャラは多め、控えのキャラも少したまる
             for (int i = 0; i < Party.Length; i++)
-                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 4 : 2));
+                Party[i].Energy = Mathf.Min(100, Party[i].Energy + (i == active ? 6 : 3));
             Sfx.Play("orb", 0.5f, 0.9f + Player.Energy / 300f);
             Fx.Sparks(Player.Pos + Vector3.up, Player.Def.ElemColor, 6, 0.5f);
         }
@@ -958,7 +958,7 @@ namespace AndoBoss
     // 空から落ちてくるエナジードリンク。拾うと体力回復
     public class Drink : MonoBehaviour
     {
-        public const float Heal = 250f;
+        public const float Heal = 400f;
         float t, y = 14;
         Vector3 pos;
         Transform can;

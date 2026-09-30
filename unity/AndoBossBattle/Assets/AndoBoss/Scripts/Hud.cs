@@ -1084,15 +1084,15 @@ namespace AndoBoss
             var stRt = stamRing.transform.parent as RectTransform;
             stRt.position = new Vector3(sp.x + 70 * canvas.scaleFactor, sp.y, 0);
             stamRing.fillAmount = P.Stam / Game.MaxStam;
-            stamRing.color = P.Stam < 25 ? new Color(1, 0.35f, 0.3f) : new Color(0.95f, 0.85f, 0.3f);
+            stamRing.color = P.Stam < Player.DodgeCost ? new Color(1, 0.35f, 0.3f) : new Color(0.95f, 0.85f, 0.3f);
             stamGroup.alpha = Mathf.MoveTowards(stamGroup.alpha, P.Stam < Game.MaxStam - 0.5f && sp.z > 0 ? 1 : 0, dt * 4);
 
             // スキル
             var ec = P.Def.ElemColor;
-            skillCdImg.fillAmount = P.SkillCd / P.Def.SkillCd;
+            skillCdImg.fillAmount = P.SkillCd / P.SkillCdMax;
             skillCdText.text = P.SkillCd > 0 ? P.SkillCd.ToString("0.0") : "";
             skillIcon.color = P.SkillCd > 0 ? Color.Lerp(ec, Color.gray, 0.6f) : ec;
-            skillRt.localScale = Vector3.one * (P.SkillCd > P.Def.SkillCd - 0.15f ? 0.9f : 1f);
+            skillRt.localScale = Vector3.one * (P.SkillCd > P.SkillCdMax - 0.15f ? 0.9f : 1f);
             skillLabel.text = P.Def.SkillName;
             burstLabelName.text = P.Def.BurstName;
             bool ready = P.Energy >= 100;
