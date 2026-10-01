@@ -26,6 +26,11 @@ namespace AndoBoss
         public const float TimeLimit = 240f;
         public float TimeLeft;
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
+        public float ClearTime;
+        public const float TimeBonusPerSec = 70f;
+        public float Limit => IsDouble ? DoubleTimeLimit : TimeLimit;
+        public float Elapsed => Limit - Mathf.Max(0, TimeLeft);
+        public static string FormatTime(float s) => $"{(int)(s / 60)}:{s % 60:00.00}";
         // 菅原先生のカウント（5つで単位消滅）
         public const int MaxCount = 5;
         public int Counts;
@@ -123,7 +128,8 @@ namespace AndoBoss
         {
             Fx.ClearAll();
             foreach (var o in FindObjectsByType<Orb>(FindObjectsSortMode.None)) Destroy(o.gameObject);
-            EnemyDmgMul = DiffDmg[Difficulty];
+            // ダブルは2人ぶんの攻撃を受けるので、1発のダメージは少し軽くする
+            EnemyDmgMul = DiffDmg[Difficulty] * (IsDouble ? 0.8f : 1f);
             PartyHp = Player.MaxHp; PartyStam = MaxStam; StamDelay = 0; SlowT = 0; ReviveUsed = false; drinkT = Random.Range(15f, 22f);
             foreach (var d in FindObjectsByType<Drink>(FindObjectsSortMode.None)) Destroy(d.gameObject);
             foreach (var p in Party) { p.ResetState(); p.gameObject.SetActive(false); }
@@ -854,13 +860,13 @@ namespace AndoBoss
         {
             if (State != Mode.Battle) return;
             State = Mode.Ending; stateT = 0; win = true;
+            ClearTime = Limit - Mathf.Max(0, TimeLeft);
             Boss.Die();
             Player.Victory = true;
             Cinematic = true;
             Hud.Letterbox(true);
             Say(Boss.Line("win"), 4.5f);
-            int bonus = KillBonus + Mathf.CeilToInt(TimeLeft) * 20 + Mathf.RoundToInt(PartyHp);
-            Hud.Banner("撃破！", $"撃破ボーナス +{bonus}", Mat.Gold, 2.6f);
+            Hud.Banner("撃破！", $"クリアタイム {FormatTime(ClearTime)}", Mat.Gold, 2.6f);
             Fx.Slow(0.15f, 1.4f);
             Fx.HitStop(0.2f);
             PostFX.I?.Flash(Color.white, 0.8f, 1.5f);
@@ -950,7 +956,9 @@ namespace AndoBoss
                 reason = loseReason,
                 dealt = Dealt,
                 killBonus = win ? KillBonus : 0,
-                timeBonus = win ? Mathf.CeilToInt(Mathf.Max(0, TimeLeft)) * 20 : 0,
+                // タイムアタック：速く倒すほど大きなボーナス（残り1秒につき70点）
+                timeBonus = win ? Mathf.RoundToInt(Mathf.Max(0, Limit - ClearTime) * TimeBonusPerSec) : 0,
+                clearTime = win ? ClearTime : -1,
                 hpBonus = win ? Mathf.RoundToInt(PartyHp) : 0,
                 perfects = Perfects,
                 perfectBonus = Perfects * 100,
@@ -963,9 +971,14 @@ namespace AndoBoss
             // 難易度で点数に倍率がかかる（やさしい ×0.7 〜 鬼 ×1.5）
             d.total = Mathf.RoundToInt(d.total * DiffScore[Difficulty]);
             d.charName = $"{Player.Def.Name}（{DiffNames[Difficulty]}）";
-            // ダブルは与ダメージの上限が 22000（+6000）、撃破ボーナスが +2000 なので基準も上げる
-            int off = IsDouble ? 8000 : 0;
-            d.grade = !win ? "不可" : d.total >= 19500 + off ? "秀" : d.total >= 18700 + off ? "優" : d.total >= 18000 + off ? "良" : "可";
+            // 成績はクリアタイムで決める（制限時間の何割で倒したか）
+            float r = ClearTime / Limit;
+            d.grade = !win ? "不可" : r <= 0.35f ? "秀" : r <= 0.5f ? "優" : r <= 0.7f ? "良" : "可";
+            // ベストタイム（先生・難易度ごと）
+            string tk = $"{BestKey}_time{Difficulty}";
+            float bestT = PlayerPrefs.GetFloat(tk, 0);
+            if (win && (bestT <= 0 || ClearTime < bestT)) { d.timeRecord = true; PlayerPrefs.SetFloat(tk, ClearTime); bestT = ClearTime; }
+            d.bestTime = bestT;
             int best = PlayerPrefs.GetInt(BestKey, 0);
             d.record = d.total > best;
             if (d.record) { PlayerPrefs.SetInt(BestKey, d.total); PlayerPrefs.Save(); }

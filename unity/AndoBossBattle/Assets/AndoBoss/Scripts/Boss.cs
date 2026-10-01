@@ -11,7 +11,7 @@ namespace AndoBoss
     {
         public const float MaxHp = 16000f;
         // ダブル（2人同時）のときは1人あたりのHPを減らす
-        public const float DoubleHp = 11000f;
+        public const float DoubleHp = 9500f;
         public float HpMax = MaxHp;
         public Vector3 HomePos = new Vector3(0, 0, 7);
         public const float Radius = 1.7f;
@@ -26,6 +26,7 @@ namespace AndoBoss
         public Elem Aura; public float AuraT;
         public int Phase = 1;
         public bool Alive => Hp > 0;
+        public bool Attacking => atk != null;
         public bool Broken => BreakT > 0;
         public bool PendingPhase;
         public string Pose = "idle";
@@ -341,6 +342,9 @@ namespace AndoBoss
                 Pos += Player.Flat(P.Pos - Pos).normalized * sp;
                 walking = true;
             }
+            // ダブルのときは、もう1人が攻撃している間は待つ（2人同時には攻撃しない）
+            var other = G.OtherBoss(this);
+            if (restT <= 0 && other != null && other.Alive && other.Attacking) restT = 0.25f;
             if (restT <= 0)
             {
                 if (IsSuga) { PickSugaAttack(); Animate(dt); return; }

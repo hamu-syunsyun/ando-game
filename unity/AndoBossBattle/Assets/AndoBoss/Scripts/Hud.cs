@@ -66,11 +66,11 @@ namespace AndoBoss
         // カットイン
         RectTransform cutBand; Text cutSmall, cutBig; CanvasGroup cutGroup; float cutT = 99;
         // リザルト
-        Text resTitle, resTotal, resGrade, resStamp, resPrompt, resRecord; RectTransform resGradeRt, resStampRt; Image resGradeRing;
+        Text resTitle, resTotal, resGrade, resStamp, resPrompt, resRecord, resBestTime, elapsedText; RectTransform resGradeRt, resStampRt; Image resGradeRing;
         readonly List<Text> resRows = new List<Text>();
         readonly List<Text> resVals = new List<Text>();
         CanvasGroup resGroup;
-        public struct ResultData { public bool win; public string reason; public int dealt, killBonus, timeBonus, hpBonus, perfectBonus, comboBonus, total, best, maxCombo, perfects, reactions; public string grade, charName; public bool record; }
+        public struct ResultData { public bool win; public string reason; public int dealt, killBonus, timeBonus, hpBonus, perfectBonus, comboBonus, total, best, maxCombo, perfects, reactions; public string grade, charName; public bool record, timeRecord; public float clearTime, bestTime; }
         ResultData res; float resT; bool resActive; int shownTotal;
 
         // ダメージ数字
@@ -248,7 +248,11 @@ namespace AndoBoss
             Place(timerText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -52));
             Shadowed(timerText, new Color(0, 0, 0, 0.7f), 3);
             dmgText = Label(battle, "与ダメージ 0", uiFont, 26, Mat.Gold, Vector2.zero, TextAnchor.MiddleRight, 400);
-            Place(dmgText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -128));
+            Place(dmgText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -136));
+            // 経過時間（タイムアタック用）
+            elapsedText = Label(battle, "", uiFont, 28, Color.white, Vector2.zero, TextAnchor.MiddleRight, 400);
+            Place(elapsedText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -104));
+            Shadowed(elapsedText, new Color(0, 0, 0, 0.7f), 2);
             Shadowed(dmgText, new Color(0, 0, 0, 0.7f), 2);
 
             // プレイヤーHP
@@ -482,6 +486,7 @@ namespace AndoBoss
             resTotal = Label(panel, "", bigFont, 64, Mat.Gold, new Vector2(0, -280), TextAnchor.MiddleCenter, 860, 90);
             Shadowed(resTotal, new Color(0.4f, 0.2f, 0), 3);
             resRecord = Label(panel, "NEW RECORD!", bigFont, 36, new Color(1, 0.45f, 0.5f), new Vector2(270, -330), TextAnchor.MiddleCenter, 500);
+            resBestTime = Label(panel, "", uiFont, 28, Color.white, new Vector2(-190, -335), TextAnchor.MiddleCenter, 480);
             resPrompt = Label(result, "", uiFont, 36, Color.white, new Vector2(0, -470), TextAnchor.MiddleCenter, 1200);
             Shadowed(resPrompt, new Color(0, 0, 0, 0.8f), 2);
 
@@ -872,7 +877,7 @@ namespace AndoBoss
             {
                 $"与えたダメージ|{d.dealt}",
                 d.win ? $"撃破ボーナス|+{d.killBonus}" : "撃破ボーナス|―",
-                d.win ? $"残り時間ボーナス|+{d.timeBonus}" : "残り時間ボーナス|―",
+                d.win ? $"<color=#ffd54d>クリアタイム {Game.FormatTime(d.clearTime)}</color>|+{d.timeBonus}" : "クリアタイム|―",
                 d.win ? $"残りHPボーナス|+{d.hpBonus}" : "残りHPボーナス|―",
                 $"ジャスト回避 ×{d.perfects}|+{d.perfectBonus}",
                 $"最大コンボ {d.maxCombo}|+{d.comboBonus}",
@@ -892,6 +897,8 @@ namespace AndoBoss
             resGradeRt.localScale = Vector3.zero;
             resStampRt.localScale = Vector3.zero;
             resRecord.gameObject.SetActive(false);
+            resBestTime.text = d.bestTime > 0 ? $"ベストタイム {Game.FormatTime(d.bestTime)}" + (d.timeRecord ? "　<color=#ff7a85>NEW!</color>" : "") : "";
+            resBestTime.color = new Color(1, 1, 1, 0);
             resPrompt.color = new Color(1, 1, 1, 0);
             var gc = d.win ? new Color(0.9f, 0.15f, 0.15f) : new Color(0.35f, 0.4f, 0.55f);
             resGrade.color = gc; resGradeRing.color = gc; resStamp.color = gc;
@@ -1128,6 +1135,7 @@ namespace AndoBoss
             timerText.text = $"{sec / 60}:{sec % 60:00}";
             timerText.color = tl < 30 ? Color.Lerp(Color.white, new Color(1, 0.35f, 0.35f), 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8)) : Color.white;
             dmgText.text = $"与ダメージ {G.Dealt}";
+            elapsedText.text = $"タイム {Game.FormatTime(G.Elapsed)}";
 
             float hpR = P.Hp / P.MaxHp;
             SetFill(playerFill, hpR);
@@ -1265,6 +1273,7 @@ namespace AndoBoss
                 resStampRt.localScale = Vector3.one * s;
                 resStampRt.localRotation = Quaternion.Euler(0, 0, 8);
                 resRecord.transform.localScale = Vector3.one * (1 + 0.08f * Mathf.Sin(resT * 8));
+                resBestTime.color = new Color(1, 1, 1, Mathf.Clamp01(u - 0.3f));
                 resPrompt.color = new Color(1, 1, 1, Mathf.Clamp01(u - 0.5f) * (0.6f + 0.4f * Mathf.Sin(resT * 4)));
             }
         }
