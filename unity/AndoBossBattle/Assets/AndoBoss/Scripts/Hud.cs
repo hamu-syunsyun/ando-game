@@ -248,10 +248,10 @@ namespace AndoBoss
             Place(timerText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -52));
             Shadowed(timerText, new Color(0, 0, 0, 0.7f), 3);
             dmgText = Label(battle, "与ダメージ 0", uiFont, 26, Mat.Gold, Vector2.zero, TextAnchor.MiddleRight, 400);
-            Place(dmgText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -136));
+            Place(dmgText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -152));
             // 経過時間（タイムアタック用）
             elapsedText = Label(battle, "", uiFont, 28, Color.white, Vector2.zero, TextAnchor.MiddleRight, 400);
-            Place(elapsedText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -104));
+            Place(elapsedText.rectTransform, tr, new Vector2(1, 1), new Vector2(-40, -118));
             Shadowed(elapsedText, new Color(0, 0, 0, 0.7f), 2);
             Shadowed(dmgText, new Color(0, 0, 0, 0.7f), 2);
 

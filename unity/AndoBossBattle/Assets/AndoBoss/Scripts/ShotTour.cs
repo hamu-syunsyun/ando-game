@@ -83,6 +83,7 @@ namespace AndoBoss
                 Fx.TimeMul = 1f;
                 yield return Wait(3f);
                 G.PartyHp = G.Player.MaxHp; G.Counts = 0;
+                G.Player.Inv = 999f; // ここから先の撮影では負けないように
             }
             // カメラが柱にめりこまないかの確認：アリーナのふち、LEDの柱の前に立つ
             {
@@ -159,6 +160,7 @@ namespace AndoBoss
                 yield return ShotCo("075_down");
                 yield return Wait(1.5f);
             }
+            G.Counts = 0; G.PartyHp = G.Player.MaxHp; G.Player.Inv = 30f;
             G.Boss.Hp = 1;
             G.DamageBoss(100, Game.HitKind.Normal, G.Boss.Pos + Vector3.up * 2.5f);
             yield return Wait(1.0f);
