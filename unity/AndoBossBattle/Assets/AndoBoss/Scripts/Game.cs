@@ -23,7 +23,7 @@ namespace AndoBoss
         public Hud Hud;
         public Music Music;
 
-        public const float TimeLimit = 240f;
+        public const float TimeLimit = 300f;
         public float TimeLeft;
         public int Dealt, Combo, MaxCombo, Perfects, Reactions;
         public float ClearTime;
@@ -36,7 +36,7 @@ namespace AndoBoss
         public int Counts;
         public static int BossKind; // 0 = 安東先生, 1 = 菅原先生, 2 = ダブル（超ハード）
         public static bool IsDouble => BossKind == 2;
-        public const float DoubleTimeLimit = 300f;
+        public const float DoubleTimeLimit = 420f;
         int KillBonus => IsDouble ? 3000 : 1000;
         int selectStep;             // 0 = ボス選択, 1 = 難易度選択, 2 = キャラ選択
         // パーティ共通のHP・スタミナ・デバフ
@@ -968,12 +968,15 @@ namespace AndoBoss
                 charName = Player.Def.Name,
             };
             d.total = d.dealt + d.killBonus + d.timeBonus + d.hpBonus + d.perfectBonus + d.comboBonus + d.reactions * 20;
+            d.total0 = d.total;
             // 難易度で点数に倍率がかかる（やさしい ×0.7 〜 鬼 ×1.5）
             d.total = Mathf.RoundToInt(d.total * DiffScore[Difficulty]);
             d.charName = $"{Player.Def.Name}（{DiffNames[Difficulty]}）";
-            // 成績はクリアタイムで決める（制限時間の何割で倒したか）
-            float r = ClearTime / Limit;
-            d.grade = !win ? "不可" : r <= 0.35f ? "秀" : r <= 0.5f ? "優" : r <= 0.7f ? "良" : "可";
+            // 成績は点数で決める（難易度の倍率をかける前の点数。与えたダメージは難易度でHPが変わるので、倒したら満点あつかい）
+            int baseDealt = IsDouble ? 19000 : 16000;
+            int gradeScore = d.total0 - d.dealt + (win ? baseDealt : d.dealt);
+            int g0 = IsDouble ? 40000 : 33000, g1 = IsDouble ? 35000 : 29000, g2 = IsDouble ? 29000 : 24000;
+            d.grade = !win ? "不可" : gradeScore >= g0 ? "秀" : gradeScore >= g1 ? "優" : gradeScore >= g2 ? "良" : "可";
             // ベストタイム（先生・難易度ごと）
             string tk = $"{BestKey}_time{Difficulty}";
             float bestT = PlayerPrefs.GetFloat(tk, 0);

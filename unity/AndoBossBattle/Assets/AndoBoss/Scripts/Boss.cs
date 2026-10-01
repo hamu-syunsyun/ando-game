@@ -666,8 +666,9 @@ namespace AndoBoss
             var side = new Vector3(fwd.z, 0, -fwd.x);
             var origin = Player.Flat(Pos) + fwd * 1.2f;
             // 3本の正弦波の「壁」。120度ずつずれていて、波は横に流れていく（すき間も動く）
-            float A = Phase == 2 ? 8.5f : 7.5f, omega = Phase == 2 ? 3.2f : 2.3f, life = Phase == 2 ? 3.6f : 3.0f;
-            const float lambda = 18f, H = 7f, startup = 0.55f, grow = 30f, maxLen = 46f;
+            // 波は長くゆるやか（波長36m）で、3枚の間（約17m）は広い。横に流れる速さはゆっくり（歩いてついていける）
+            float A = Phase == 2 ? 10.5f : 10f, omega = Phase == 2 ? 0.7f : 0.45f, life = Phase == 2 ? 4.8f : 4.2f;
+            const float lambda = 36f, H = 7f, startup = 0.55f, grow = 30f, maxLen = 46f;
             var root = new GameObject("wave3");
             var meshes = new Mesh[3];
             var mats = new Material[3];

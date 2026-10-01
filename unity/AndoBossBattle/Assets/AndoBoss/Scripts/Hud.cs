@@ -70,7 +70,7 @@ namespace AndoBoss
         readonly List<Text> resRows = new List<Text>();
         readonly List<Text> resVals = new List<Text>();
         CanvasGroup resGroup;
-        public struct ResultData { public bool win; public string reason; public int dealt, killBonus, timeBonus, hpBonus, perfectBonus, comboBonus, total, best, maxCombo, perfects, reactions; public string grade, charName; public bool record, timeRecord; public float clearTime, bestTime; }
+        public struct ResultData { public bool win; public string reason; public int total0, dealt, killBonus, timeBonus, hpBonus, perfectBonus, comboBonus, total, best, maxCombo, perfects, reactions; public string grade, charName; public bool record, timeRecord; public float clearTime, bestTime; }
         ResultData res; float resT; bool resActive; int shownTotal;
 
         // ダメージ数字
